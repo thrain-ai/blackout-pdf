@@ -14,7 +14,8 @@ export const PRO_PRICE_LABEL = "$29";
 // https://buy.stripe.com/...). The payment link's after-payment setting must
 // redirect to <site>/?checkout=success&session_id={CHECKOUT_SESSION_ID} so Pro
 // auto-activates. While null, Pro buttons show a waitlist mailto instead.
-export const CHECKOUT_URL: string | null = null;
+export const CHECKOUT_URL: string | null =
+  "https://buy.stripe.com/fZucN53nTbrEbNWbEBcAo00";
 
 // Lemon Squeezy license validation (their /v1/licenses/validate endpoint is
 // public + CORS-enabled; no API key needed). Leave as-is.
