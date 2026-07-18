@@ -38,7 +38,7 @@ same artifact works on `*.github.io/blackout-pdf/` and on a custom domain.
 
 ## Monetization
 
-Free tier: documents up to 10 pages. Pro ($29 one-time): unlimited. All
+Free tier: documents up to 10 pages. Pro ($25 one-time): unlimited. All
 commercial knobs live in [`src/config.ts`](src/config.ts); the go-live
 checklist is in [`docs/MONETIZATION.md`](docs/MONETIZATION.md).
 

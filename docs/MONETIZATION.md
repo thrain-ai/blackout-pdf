@@ -4,22 +4,24 @@ Goal set at kickoff (2026-07-18): **first $100 revenue within 30 days.**
 Running cost: **$0/month** (GitHub Pages). Everything below is a one-time
 setup step or a marketing action.
 
-## 1. Turn on payments (~20 minutes, the only blocking step)
+## 1. Payments — LIVE as of 2026-07-18 ✅
 
-The app is already wired for [Lemon Squeezy](https://lemonsqueezy.com)
-(merchant of record — they handle VAT/sales tax, good for a solo operator):
+Checkout runs on a **Stripe payment link** (Managed Payments handles tax as
+merchant of record) wired into `src/config.ts`:
 
-1. Create a Lemon Squeezy account + store.
-2. Add a product: **Blackout PDF Pro**, $29, one-time. Enable **license keys**
-   (Product → Confirmation → generate license keys, activation limit 3).
-3. Copy the product's checkout link.
-4. In `src/config.ts`, set `CHECKOUT_URL = "<that link>"`.
-5. Push to `main` — Pages redeploys automatically.
+- Product: **Blackout PDF Pro**, $25 one-time.
+- The payment link's after-payment setting redirects to
+  `<site>/?checkout=success&session_id={CHECKOUT_SESSION_ID}`, which
+  auto-activates Pro on the buyer's device (`src/license.ts`) — no backend.
+- Cross-device activation is manual for now (buyer emails their receipt).
+  If sales justify it, add a free Cloudflare Worker that verifies the
+  session id against Stripe and mints a signed license key.
+- To change the price: update it in Stripe AND `PRO_PRICE_LABEL` in
+  `src/config.ts`.
 
-That's it: checkout is Lemon Squeezy-hosted, and the app validates keys
-against their public `licenses/validate` endpoint (`src/license.ts`) — no
-backend needed. Stripe Payment Links work too, but then license keys need
-manual emailing; Lemon Squeezy automates it.
+(The original Lemon Squeezy license-key path still exists in `license.ts`
+and activates automatically if `CHECKOUT_URL` is ever pointed at a
+non-Stripe provider.)
 
 ## 2. Point a domain at it (~10 minutes)
 

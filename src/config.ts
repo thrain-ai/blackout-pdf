@@ -8,7 +8,7 @@ export const PRODUCT_NAME = "Blackout PDF";
 // Pages allowed per export on the free tier.
 export const FREE_PAGE_LIMIT = 10;
 
-export const PRO_PRICE_LABEL = "$29";
+export const PRO_PRICE_LABEL = "$25";
 
 // Checkout link for the Pro lifetime license (Stripe payment link,
 // https://buy.stripe.com/...). The payment link's after-payment setting must
