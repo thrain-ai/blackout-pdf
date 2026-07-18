@@ -40,7 +40,9 @@ async function extractText(buf) {
 }
 
 const server = await preview({ preview: { port: 4173, host: "127.0.0.1" } });
-const base = "http://127.0.0.1:4173/";
+// Derive the URL from the server: if the port was busy, vite picks another,
+// and a hardcoded URL would silently test a stale instance.
+const base = server.resolvedUrls.local[0];
 console.log("preview server at", base);
 
 const browser = await launch({
@@ -58,7 +60,7 @@ try {
   // 1. Landing renders
   await page.waitForSelector(".dropzone", { timeout: 10000 });
   const h1 = await page.$eval("h1", (el) => el.textContent);
-  if (!/Redact PDFs/.test(h1)) fail("hero headline missing: " + h1);
+  if (!/never leave your/.test(h1)) fail("hero headline missing: " + h1);
   ok("landing renders: " + h1.trim());
 
   // 2. Upload the test PDF

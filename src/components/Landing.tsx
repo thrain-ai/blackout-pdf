@@ -13,6 +13,18 @@ interface Props {
   error: string | null;
 }
 
+// A word hidden under a marker swipe; hovering (or focusing) peels the bar
+// back. The trailing punctuation belongs INSIDE the bar — a redactor would
+// never leave a period dangling.
+function Redacted({ children }: { children: string }) {
+  return (
+    <span className="redacted" tabIndex={0} aria-label={`redacted: ${children}`}>
+      <span className="word">{children}</span>
+      <span className="swipe" aria-hidden="true" />
+    </span>
+  );
+}
+
 const FAQ: [string, string][] = [
   [
     "Is my PDF uploaded anywhere?",
@@ -72,12 +84,13 @@ export default function Landing({ onFile, loading, error }: Props) {
 
       <section className="hero">
         <h1>
-          Redact PDFs <em>without uploading them.</em>
+          Your <Redacted>files</Redacted> never leave your{" "}
+          <Redacted>device.</Redacted>
         </h1>
         <p className="sub">
           Blackout finds Social Security numbers, emails, phone and card numbers
-          in your PDF and removes them <strong>for real</strong> — entirely in
-          your browser. Your file never touches a server.
+          in your PDF and removes them <em>for real</em> — entirely in your
+          browser. No uploads. No account. No trace.
         </p>
 
         <div
@@ -105,13 +118,13 @@ export default function Landing({ onFile, loading, error }: Props) {
             }}
           />
           {loading ? (
-            <span>Opening…</span>
+            <span className="dz-main">Opening…</span>
           ) : (
             <>
-              <span className="dz-main">Drop a PDF here or click to choose</span>
+              <span className="dz-main">Drop a PDF — it stays here</span>
               <span className="dz-sub">
-                Free up to {FREE_PAGE_LIMIT} pages · no signup · nothing leaves
-                your device
+                or click to choose · free up to {FREE_PAGE_LIMIT} pages · no
+                signup
               </span>
             </>
           )}
@@ -119,9 +132,9 @@ export default function Landing({ onFile, loading, error }: Props) {
         {error && <p className="error">{error}</p>}
 
         <p className="trust-row">
-          <span>0 uploads</span> · <span>0 tracking</span> ·{" "}
-          <span>open source</span> · <span>works offline once loaded</span>
+          0 uploads · 0 tracking · open source · works offline once loaded
         </p>
+        <p className="hover-tip">↑ psst — hover the black bars</p>
       </section>
 
       <section className="steps">
