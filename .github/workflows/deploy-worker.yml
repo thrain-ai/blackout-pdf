@@ -18,6 +18,8 @@ jobs:
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          # Required for account-owned API tokens, which can't list memberships.
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: worker
       - name: Skipped notice
         if: ${{ vars.WORKER_DEPLOY_ENABLED != 'true' }}
