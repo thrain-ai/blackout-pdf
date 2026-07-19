@@ -177,7 +177,14 @@ const tokenMatch = mail.text.match(/license_token=([^\s&]+)/);
 if (!tokenMatch) fail("restore email has no license_token link");
 if (!(await verify(decodeURIComponent(tokenMatch[1]))))
   fail("restore email token does not verify");
+if (!mail.html || !mail.html.includes("email-logo.png"))
+  fail("restore email html missing logo");
+if (!mail.html.includes("Thrain Support"))
+  fail("restore email html missing signature");
+if (!mail.html.includes(tokenMatch[1]))
+  fail("restore email html missing the activation link");
 ok("buyer restore sends email with a verifiable activation link");
+ok("restore email is branded (logo, Thrain Support signature, html + text)");
 
 // 8. /restore for a stranger: no email sent, same generic response
 res = await worker.fetch(
