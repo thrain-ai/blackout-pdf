@@ -5,6 +5,7 @@ compatibility_date = "2026-07-01"
 [vars]
 SITE_URL = "https://blackout.thrain.ai"
 ALLOWED_ORIGIN = "https://blackout.thrain.ai"
+MAIL_FROM = "Blackout PDF <support@thrain.ai>"
 
 # Secrets (set via `wrangler secret put <NAME>` or the dashboard — never here):
 #   STRIPE_SECRET_KEY   restricted key: read-only Checkout Sessions + Customers
