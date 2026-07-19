@@ -31,33 +31,29 @@ export default function UpgradeModal({ pageCount, onClose }: Props) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <button className="modal-x" onClick={onClose} aria-label="Close">
+          ✕
+        </button>
         <h2>This document has {pageCount} pages</h2>
         <p>
-          The free version exports up to {FREE_PAGE_LIMIT} pages. Pro removes
-          the limit forever — {PRO_PRICE_LABEL}, one-time, still 100% in your
-          browser.
+          Free exports up to {FREE_PAGE_LIMIT}. Pro is unlimited, forever —{" "}
+          {PRO_PRICE_LABEL} one-time, still 100% in your browser.
         </p>
         {CHECKOUT_URL ? (
-          <>
-            <a className="btn" href={CHECKOUT_URL}>
-              Get Pro — {PRO_PRICE_LABEL} one-time
-            </a>
-            <p className="meta">
-              You'll be sent back here after payment and Pro unlocks
-              automatically.
-            </p>
-          </>
+          <a className="btn" href={CHECKOUT_URL}>
+            Get Pro
+          </a>
         ) : (
           <a
             className="btn"
             href={`mailto:${CONTACT_EMAIL}?subject=Blackout%20PDF%20Pro%20waitlist`}
           >
-            Pro launches soon — join the waitlist
+            Join the waitlist
           </a>
         )}
 
-        {WORKER_URL ? (
-          showRestore ? (
+        {WORKER_URL &&
+          (showRestore ? (
             <>
               <div className="license-row">
                 <input
@@ -77,22 +73,7 @@ export default function UpgradeModal({ pageCount, onClose }: Props) {
             <button className="link-btn" onClick={() => setShowRestore(true)}>
               Already bought Pro? Restore your purchase
             </button>
-          )
-        ) : (
-          <p className="meta">
-            Bought it on another device? Email{" "}
-            <a
-              href={`mailto:${CONTACT_EMAIL}?subject=Blackout%20PDF%20Pro%20activation`}
-            >
-              {CONTACT_EMAIL}
-            </a>{" "}
-            with your receipt and we'll sort it fast.
-          </p>
-        )}
-
-        <button className="link-btn close" onClick={onClose}>
-          Not now
-        </button>
+          ))}
       </div>
     </div>
   );

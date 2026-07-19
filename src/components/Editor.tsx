@@ -139,8 +139,31 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
         <button className="link-btn" onClick={onClose}>
           ← New file
         </button>
-        <h2 className="filename" title={filename}>
-          {filename}
+        <h2 className="filename">
+          <span className="filename-text" title={filename}>
+            {filename}
+          </span>
+          {!scanning && (
+            <span
+              className="scan-badge"
+              tabIndex={0}
+              data-tip={`Scanned for ${PATTERNS.map((p) => p.label.toLowerCase()).join(", ")}`}
+              aria-label={`Scanned for ${PATTERNS.map((p) => p.label.toLowerCase()).join(", ")}`}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                width="11"
+                height="11"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M4 12.5 9.5 18 20 6.5" />
+              </svg>
+            </span>
+          )}
         </h2>
         <p className="meta">
           {doc.numPages} page{doc.numPages === 1 ? "" : "s"}
@@ -151,6 +174,9 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
           {[...PATTERNS.map((p) => p.id), CUSTOM_PATTERN_ID].map((cat) => {
             const items = byCategory.get(cat) ?? [];
             if (cat === CUSTOM_PATTERN_ID && customTerms.length === 0) return null;
+            // Empty auto-detect categories collapse into one muted summary
+            // line below instead of rendering a card each.
+            if (cat !== CUSTOM_PATTERN_ID && items.length === 0) return null;
             const accepted = items.filter((s) => s.accepted).length;
             return (
               <div className="category" key={cat}>
@@ -172,24 +198,59 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
                     </button>
                   )}
                 </div>
-                {items.length > 0 && (
-                  <ul>
-                    {items.slice(0, 50).map((s) => (
-                      <li key={s.id}>
-                        <label>
-                          <input
-                            type="checkbox"
-                            checked={s.accepted}
-                            onChange={(e) => setAccepted([s.id], e.target.checked)}
-                          />
-                          <span className="match-text">{s.text}</span>
-                          <span className="match-page">p{s.pageIndex + 1}</span>
-                        </label>
-                      </li>
-                    ))}
-                    {items.length > 50 && <li className="meta">…and {items.length - 50} more</li>}
-                  </ul>
-                )}
+                {items.length > 0 &&
+                  (() => {
+                    // One row per unique match text — a word that appears 40
+                    // times is one row with ×40, not 40 identical rows.
+                    const groups = new Map<string, Suggestion[]>();
+                    for (const s of items) {
+                      const k = s.text.toLowerCase();
+                      groups.set(k, [...(groups.get(k) ?? []), s]);
+                    }
+                    const rows = [...groups.values()];
+                    return (
+                      <ul>
+                        {rows.slice(0, 40).map((group) => {
+                          const allOn = group.every((s) => s.accepted);
+                          const pages = [
+                            ...new Set(group.map((s) => s.pageIndex)),
+                          ].sort((a, b) => a - b);
+                          return (
+                            <li key={group[0].id}>
+                              <label>
+                                <input
+                                  type="checkbox"
+                                  checked={allOn}
+                                  onChange={() =>
+                                    setAccepted(
+                                      group.map((s) => s.id),
+                                      !allOn,
+                                    )
+                                  }
+                                />
+                                <span className="match-text">
+                                  {group[0].text}
+                                </span>
+                                {group.length > 1 && (
+                                  <span className="match-count">
+                                    ×{group.length}
+                                  </span>
+                                )}
+                                <span className="match-page">
+                                  {pages.length === 1
+                                    ? `p${pages[0] + 1}`
+                                    : `${pages.length} pgs`}
+                                </span>
+                              </label>
+                            </li>
+                          );
+                        })}
+                        {rows.length > 40 && (
+                          <li className="meta">…and {rows.length - 40} more</li>
+                        )}
+                      </ul>
+                    );
+                  })()}
               </div>
             );
           })}
@@ -207,36 +268,67 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
           </button>
         </div>
         {customTerms.length > 0 && (
-          <p className="meta terms-list">
-            Searching: {customTerms.join(", ")}{" "}
-            <button className="link-btn" onClick={() => setCustomTerms([])}>
-              clear
-            </button>
-          </p>
+          <div className="term-chips">
+            {customTerms.map((t) => (
+              <span className="term-chip" key={t}>
+                {t}
+                <button
+                  aria-label={`Stop searching for ${t}`}
+                  title="Remove"
+                  onClick={() =>
+                    setCustomTerms((prev) => prev.filter((x) => x !== t))
+                  }
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="12"
+                    height="12"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                  >
+                    <path d="M3 6h18M8 6V4h8v2M6 6l1 15h10l1-15M10 10v7M14 10v7" />
+                  </svg>
+                </button>
+              </span>
+            ))}
+          </div>
         )}
 
-        <p className="tip">Tip: drag on any page to draw a redaction box.</p>
-
         <div className="export-area">
-          <button
-            className="btn export-btn"
-            disabled={exporting !== null || acceptedCount === 0}
-            onClick={doExport}
-          >
-            {exporting
-              ? `Exporting ${exporting.done}/${exporting.total}…`
-              : `Export redacted PDF (${acceptedCount})`}
-          </button>
-          {!pro && doc.numPages > FREE_PAGE_LIMIT && (
-            <p className="meta">
-              {doc.numPages} pages — free covers {FREE_PAGE_LIMIT}.{" "}
-              <button className="link-btn" onClick={() => setShowUpgrade(true)}>
-                Upgrade
-              </button>
-            </p>
+          {/* Over the free limit, the export button IS the upgrade button —
+              one control, no duplicate nag line. */}
+          {!pro && doc.numPages > FREE_PAGE_LIMIT ? (
+            <button
+              className="btn export-btn"
+              disabled={acceptedCount === 0}
+              onClick={() => setShowUpgrade(true)}
+            >
+              Upgrade to export
+            </button>
+          ) : (
+            <button
+              className="btn export-btn"
+              disabled={exporting !== null || acceptedCount === 0}
+              onClick={doExport}
+            >
+              {exporting
+                ? `Exporting ${exporting.done}/${exporting.total}…`
+                : `Export PDF (${acceptedCount} redaction${acceptedCount === 1 ? "" : "s"})`}
+            </button>
           )}
         </div>
       </aside>
+
+      <span
+        className="info-badge"
+        tabIndex={0}
+        data-tip="Tip: drag on any page to draw a redaction box. Click a black box to remove it."
+        aria-label="Tip: drag on any page to draw a redaction box. Click a black box to remove it."
+      >
+        i
+      </span>
 
       <main className="pages">
         {pages.map((p) => (
