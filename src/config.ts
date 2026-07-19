@@ -21,7 +21,8 @@ export const CHECKOUT_URL: string | null =
 // server-side and mints signed tokens. While null, the app falls back to the
 // launch-era honor-system redirect unlock. Set to the deployed workers.dev
 // URL (no trailing slash) to enforce real licensing.
-export const WORKER_URL: string | null = null;
+export const WORKER_URL: string | null =
+  "https://blackout-license.thrain.workers.dev";
 
 // Public half of the license signing keypair (worker holds the private half).
 // Verifies tokens locally — works offline, can't mint them.
