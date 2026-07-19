@@ -37,6 +37,30 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
   const [showUpgrade, setShowUpgrade] = useState(false);
   const acceptedKeys = useRef(new Set<string>());
 
+  // --- mobile adaptations -------------------------------------------------
+  // Coarse pointer = touch device: drags scroll by default, drawing is an
+  // explicit mode; the sidebar becomes a bottom sheet behind an action bar.
+  const coarsePointer = useMemo(
+    () => window.matchMedia("(pointer: coarse)").matches,
+    [],
+  );
+  const [drawMode, setDrawMode] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const pagesRef = useRef<HTMLElement>(null);
+  const [pagesWidth, setPagesWidth] = useState(860);
+  useEffect(() => {
+    const el = pagesRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width;
+      if (w) setPagesWidth(w);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const pageMaxWidth = Math.min(860, pagesWidth);
+  const drawEnabled = !coarsePointer || drawMode;
+
   // Scan (and re-scan when custom terms change), preserving accepted state.
   useEffect(() => {
     let cancelled = false;
@@ -133,9 +157,11 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
     }
   };
 
+  const overLimit = !pro && doc.numPages > FREE_PAGE_LIMIT;
+
   return (
     <div className="editor">
-      <aside className="sidebar">
+      <aside className={`sidebar${sheetOpen ? " open" : ""}`}>
         <button className="link-btn" onClick={onClose}>
           ← New file
         </button>
@@ -299,7 +325,7 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
         <div className="export-area">
           {/* Over the free limit, the export button IS the upgrade button —
               one control, no duplicate nag line. */}
-          {!pro && doc.numPages > FREE_PAGE_LIMIT ? (
+          {overLimit ? (
             <button
               className="btn export-btn"
               disabled={acceptedCount === 0}
@@ -321,6 +347,49 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
         </div>
       </aside>
 
+      {/* Mobile action bar: sheet toggle + export, pinned above the safe area. */}
+      <div className="mobile-bar">
+        <button
+          className="mini-btn sheet-toggle"
+          aria-expanded={sheetOpen}
+          onClick={() => setSheetOpen((v) => !v)}
+        >
+          {sheetOpen ? "Close" : "Details"}
+        </button>
+        {overLimit ? (
+          <button
+            className="btn"
+            disabled={acceptedCount === 0}
+            onClick={() => setShowUpgrade(true)}
+          >
+            Upgrade to export
+          </button>
+        ) : (
+          <button
+            className="btn"
+            disabled={exporting !== null || acceptedCount === 0}
+            onClick={doExport}
+          >
+            {exporting
+              ? `Exporting ${exporting.done}/${exporting.total}…`
+              : `Export (${acceptedCount})`}
+          </button>
+        )}
+      </div>
+
+      {/* Touch-only: explicit draw mode so one-finger drags scroll by default.
+          Hidden while the sheet is open so it can't cover sheet controls. */}
+      {coarsePointer && !sheetOpen && (
+        <button
+          className={`draw-toggle${drawMode ? " on" : ""}`}
+          aria-pressed={drawMode}
+          title={drawMode ? "Drawing boxes — tap to scroll instead" : "Tap to draw redaction boxes"}
+          onClick={() => setDrawMode((v) => !v)}
+        >
+          ✏️
+        </button>
+      )}
+
       <span
         className="info-badge"
         tabIndex={0}
@@ -330,7 +399,7 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
         i
       </span>
 
-      <main className="pages">
+      <main className="pages" ref={pagesRef}>
         {pages.map((p) => (
           <PageView
             key={p.index}
@@ -341,6 +410,8 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
             onToggleSuggestion={(id, accepted) => setAccepted([id], accepted)}
             onAddBox={addManualBox}
             onRemoveBox={removeManualBox}
+            maxWidth={pageMaxWidth}
+            drawEnabled={drawEnabled}
           />
         ))}
       </main>

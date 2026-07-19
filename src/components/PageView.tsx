@@ -10,9 +10,12 @@ interface Props {
   onToggleSuggestion: (id: string, accepted: boolean) => void;
   onAddBox: (pageIndex: number, rect: Rect) => void;
   onRemoveBox: (id: string) => void;
+  // Available width for the page (fit-to-width on small screens).
+  maxWidth: number;
+  // When false (touch devices with draw mode off), drags scroll instead of
+  // drawing redaction boxes.
+  drawEnabled: boolean;
 }
-
-const MAX_WIDTH = 860;
 
 export default function PageView({
   doc,
@@ -22,13 +25,15 @@ export default function PageView({
   onToggleSuggestion,
   onAddBox,
   onRemoveBox,
+  maxWidth,
+  drawEnabled,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const [drawing, setDrawing] = useState<Rect | null>(null);
   const dragStart = useRef<{ x: number; y: number } | null>(null);
 
-  const displayScale = Math.min(1.25, MAX_WIDTH / page.width);
+  const displayScale = Math.min(1.25, maxWidth / page.width);
   const cssW = page.width * displayScale;
   const cssH = page.height * displayScale;
 
@@ -63,8 +68,13 @@ export default function PageView({
   };
 
   const onPointerDown = (e: React.PointerEvent) => {
+    if (!drawEnabled) return; // touch scroll mode: let the browser pan
     if (e.target !== overlayRef.current) return; // let box clicks through
-    overlayRef.current!.setPointerCapture(e.pointerId);
+    try {
+      overlayRef.current!.setPointerCapture(e.pointerId);
+    } catch {
+      /* synthetic events in tests have no capturable pointer */
+    }
     dragStart.current = toPage(e);
     setDrawing(null);
   };
@@ -103,7 +113,7 @@ export default function PageView({
         <canvas ref={canvasRef} style={{ width: cssW, height: cssH }} />
         <div
           ref={overlayRef}
-          className="overlay"
+          className={`overlay${drawEnabled ? "" : " scroll-mode"}`}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
