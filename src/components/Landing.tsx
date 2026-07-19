@@ -7,7 +7,9 @@ import {
   PRO_PRICE_LABEL,
   CHECKOUT_URL,
   CONTACT_EMAIL,
+  WORKER_URL,
 } from "../config.ts";
+import RestorePurchase from "./RestorePurchase.tsx";
 
 interface Props {
   onFile: (f: File) => void;
@@ -28,31 +30,42 @@ function Redacted({ children }: { children: string }) {
   );
 }
 
-const FAQ: [string, string][] = [
-  [
-    "Is my PDF uploaded anywhere?",
-    "No. Everything happens on your own computer, inside your browser. There's no upload, no account, and no company server holding your files. You can even load this page, turn off your Wi-Fi, and keep working.",
-  ],
-  [
-    "Is the redacted text really gone?",
-    "Yes. Many tools just draw a black rectangle on top of the text, which anyone can copy-paste straight through. Blackout rebuilds each page as a flat image with the black boxes burned in, so the underlying text no longer exists in the exported file.",
-  ],
-  [
-    "What does it detect automatically?",
-    "Social Security numbers, email addresses, phone numbers, and credit card numbers. You can also search for any custom word or name, and draw redaction boxes anywhere by hand.",
-  ],
-  [
-    "Does it work on scanned PDFs?",
-    "Automatic detection works on PDFs with selectable text (if you can highlight the words, it works). For scans that are essentially photos of paper, automatic search can't read them — but you can still draw redaction boxes anywhere by hand, on any PDF.",
-  ],
-  [
-    "What's the catch with the free version?",
-    `Free covers documents up to ${FREE_PAGE_LIMIT} pages per export, which is most everyday redaction jobs. Pro (${PRO_PRICE_LABEL}, one-time) removes the limit forever.`,
-  ],
-  [
-    "Why should I trust this?",
-    "The source code is public on GitHub, the site is a static page with no backend, no analytics, and no tracking scripts. Verify with your browser's network tab: after loading, nothing is transmitted.",
-  ],
+interface FaqEntry {
+  q: string;
+  a: string;
+  restoreForm?: boolean;
+}
+
+const FAQ: FaqEntry[] = [
+  {
+    q: "Is my PDF uploaded anywhere?",
+    a: "No. Everything happens on your own computer, inside your browser. There's no upload, no account, and no company server holding your files. You can even load this page, turn off your Wi-Fi, and keep working.",
+  },
+  {
+    q: "Is the redacted text really gone?",
+    a: "Yes. Many tools just draw a black rectangle on top of the text, which anyone can copy-paste straight through. Blackout rebuilds each page as a flat image with the black boxes burned in, so the underlying text no longer exists in the exported file.",
+  },
+  {
+    q: "What does it detect automatically?",
+    a: "Social Security numbers, email addresses, phone numbers, and credit card numbers. You can also search for any custom word or name, and draw redaction boxes anywhere by hand.",
+  },
+  {
+    q: "Does it work on scanned PDFs?",
+    a: "Automatic detection works on PDFs with selectable text (if you can highlight the words, it works). For scans that are essentially photos of paper, automatic search can't read them — but you can still draw redaction boxes anywhere by hand, on any PDF.",
+  },
+  {
+    q: "What's the catch with the free version?",
+    a: `Free covers documents up to ${FREE_PAGE_LIMIT} pages per export, which is most everyday redaction jobs. Pro (${PRO_PRICE_LABEL}, one-time) removes the limit forever.`,
+  },
+  {
+    q: "How do I reactivate Pro?",
+    a: "Pro remembers the browser you activated it on. If you cleared your browsing data, got a new computer, or want Pro on another device, enter the email you purchased with and we'll send you an activation link — it works on any device you open it on.",
+    restoreForm: true,
+  },
+  {
+    q: "Why should I trust this?",
+    a: "The source code is public on GitHub, the site is a static page with no backend, no analytics, and no tracking scripts. Verify with your browser's network tab: after loading, nothing is transmitted.",
+  },
 ];
 
 export default function Landing({ onFile, loading, error, pro }: Props) {
@@ -261,10 +274,11 @@ export default function Landing({ onFile, loading, error, pro }: Props) {
 
       <section className="faq" id="faq">
         <h2>FAQ</h2>
-        {FAQ.map(([q, a]) => (
+        {FAQ.map(({ q, a, restoreForm }) => (
           <details key={q}>
             <summary>{q}</summary>
             <p>{a}</p>
+            {restoreForm && WORKER_URL && <RestorePurchase />}
           </details>
         ))}
       </section>

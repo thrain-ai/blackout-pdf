@@ -6,7 +6,7 @@ import {
   PRO_PRICE_LABEL,
   WORKER_URL,
 } from "../config.ts";
-import { requestRestoreEmail } from "../license.ts";
+import RestorePurchase from "./RestorePurchase.tsx";
 
 interface Props {
   pageCount: number;
@@ -15,18 +15,7 @@ interface Props {
 }
 
 export default function UpgradeModal({ pageCount, onClose }: Props) {
-  const [email, setEmail] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
   const [showRestore, setShowRestore] = useState(false);
-
-  const restore = async () => {
-    setBusy(true);
-    setMsg(null);
-    const res = await requestRestoreEmail(email.trim());
-    setBusy(false);
-    setMsg(res.message);
-  };
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -54,21 +43,7 @@ export default function UpgradeModal({ pageCount, onClose }: Props) {
 
         {WORKER_URL &&
           (showRestore ? (
-            <>
-              <div className="license-row">
-                <input
-                  type="email"
-                  placeholder="Email you purchased with"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && restore()}
-                />
-                <button className="mini-btn" disabled={busy} onClick={restore}>
-                  {busy ? "…" : "Send link"}
-                </button>
-              </div>
-              {msg && <p className="meta">{msg}</p>}
-            </>
+            <RestorePurchase />
           ) : (
             <button className="link-btn" onClick={() => setShowRestore(true)}>
               Already bought Pro? Restore your purchase

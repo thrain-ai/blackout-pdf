@@ -991,6 +991,18 @@ footer a:hover {
   gap: 8px;
 }
 
+.restore-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* In the FAQ, keep the restore form compact under its answer text. */
+.faq .restore-form {
+  max-width: 400px;
+  margin-top: 12px;
+}
+
 .modal .close {
   align-self: center;
   color: var(--muted);
