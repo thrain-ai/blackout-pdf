@@ -39,5 +39,6 @@ export const LICENSE_PUBLIC_KEY: JsonWebKey = {
 export const LICENSE_VALIDATE_URL =
   "https://api.lemonsqueezy.com/v1/licenses/validate";
 
-// Fallback contact while checkout is not yet live.
-export const CONTACT_EMAIL = "baileyrthomp@gmail.com";
+// Public support address (ImprovMX forwards to the owner's inbox; Resend
+// sends restore emails from it).
+export const CONTACT_EMAIL = "support@thrain.ai";
