@@ -14,4 +14,7 @@ export default defineConfig({
     // PREVIEW_ALLOW=my.host npx vite preview --host 0.0.0.0
     allowedHosts: process.env.PREVIEW_ALLOW ? [process.env.PREVIEW_ALLOW] : [],
   },
+  server: {
+    allowedHosts: process.env.PREVIEW_ALLOW ? [process.env.PREVIEW_ALLOW] : [],
+  },
 });

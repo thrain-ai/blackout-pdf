@@ -98,6 +98,15 @@ export async function activateFromUrl(): Promise<boolean> {
   const scrub = () =>
     history.replaceState(null, "", window.location.pathname);
 
+  // Dev-only UI preview of the Pro experience (?dev_pro=1). import.meta.env.DEV
+  // is false in production builds, so this branch is dead-code-eliminated —
+  // it does not exist in the deployed bundle.
+  if (import.meta.env.DEV && params.get("dev_pro")) {
+    scrub();
+    store("dev");
+    return true;
+  }
+
   const linkToken = params.get("license_token");
   if (linkToken) {
     scrub();
@@ -132,6 +141,8 @@ export async function activateFromUrl(): Promise<boolean> {
 export async function isLicensed(): Promise<boolean> {
   const value = stored();
   if (!value) return false;
+
+  if (import.meta.env.DEV && value === "dev") return true;
 
   if (value.startsWith("stripe:")) {
     if (!WORKER_URL) return true; // launch-era behavior
