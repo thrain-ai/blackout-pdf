@@ -10,7 +10,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 const TEST_PDF = process.argv[2] ?? "/mnt/d/claude/output/blackout-test.pdf";
-const OUT = process.argv[3] ?? ".";
+const OUT = process.argv[3] ?? "/tmp";
 const CHROME_BIN =
   process.env.CHROME_BIN ??
   join(
