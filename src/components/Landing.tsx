@@ -100,7 +100,7 @@ export default function Landing({ onFile, loading, error, pro }: Props) {
         <span className="dz-main">Opening…</span>
       ) : (
         <>
-          <span className="dz-main">Drop a PDF — it stays here</span>
+          <span className="dz-main">Drop a PDF</span>
           <span className="dz-sub">
             {pro
               ? "or click to choose · unlimited pages"
@@ -150,17 +150,13 @@ export default function Landing({ onFile, loading, error, pro }: Props) {
           Your <Redacted>files</Redacted> never leave your{" "}
           <Redacted>device.</Redacted>
         </h1>
-        <p className="sub">
-          Blackout finds Social Security numbers, emails, phone and card numbers
-          in your PDF and removes them <em>for real</em> — entirely in your
-          browser. No uploads. No account. No trace.
-        </p>
+        <p className="sub">Blackout PDF documents entirely in your browser.</p>
 
         {dropzone}
         {error && <p className="error">{error}</p>}
 
         <p className="trust-row">
-          0 uploads · 0 tracking · open source · works offline once loaded
+          open source · works offline once loaded
         </p>
         <p className="hover-tip">↑ psst — hover the black bars</p>
       </section>
