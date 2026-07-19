@@ -9,18 +9,23 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # Requires the CLOUDFLARE_API_TOKEN repo secret ("Edit Cloudflare Workers"
-    # template). Until it exists, this job is skipped rather than failing.
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        if: ${{ vars.WORKER_DEPLOY_ENABLED == 'true' }}
+        with:
+          node-version: 22
       - name: Deploy with wrangler
         if: ${{ vars.WORKER_DEPLOY_ENABLED == 'true' }}
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          # Required for account-owned API tokens, which can't list memberships.
-          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: worker
+        working-directory: worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          # Account-owned tokens can't discover the account; accept the id
+          # from either a repo variable or a secret, whichever exists.
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npm install --no-fund --no-audit wrangler@4
+          npx --yes wrangler deploy
       - name: Skipped notice
         if: ${{ vars.WORKER_DEPLOY_ENABLED != 'true' }}
         run: echo "Worker deploy skipped — set repo variable WORKER_DEPLOY_ENABLED=true and add CLOUDFLARE_API_TOKEN secret."
