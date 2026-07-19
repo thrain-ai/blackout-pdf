@@ -49,6 +49,29 @@ async function stripeGet(env, path) {
   return data;
 }
 
+// Branded activation email. Email-client-safe: tables, inline styles, hosted
+// PNG logos (Gmail strips SVG/box-shadow, so the marks are pre-rendered
+// images served from the site).
+function activationEmailHtml(env, link) {
+  const logo = `${env.SITE_URL}/email-logo.png`;
+  const proLogo = `${env.SITE_URL}/email-logo-pro.png`;
+  return `<!doctype html><html><body style="margin:0;padding:0;background:#eceae2;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eceae2;"><tr><td align="center" style="padding:36px 16px;">
+<table role="presentation" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background:#f7f6f2;border-radius:12px;font-family:Arial,Helvetica,sans-serif;color:#101010;">
+<tr><td style="padding:36px 40px;">
+  <img src="${logo}" width="78" alt="Blackout PDF" style="display:block;border:0;margin-bottom:26px;">
+  <div style="font-size:22px;font-weight:bold;margin-bottom:12px;">Activate Blackout PDF Pro</div>
+  <div style="font-size:15px;line-height:1.6;color:#3c3c38;margin-bottom:26px;">Click the button below to activate Pro on this device. The link works on any device you open it on &mdash; keep this email, it&#39;s your license.</div>
+  <a href="${link}" style="display:inline-block;background:#f5b400;color:#101010;font-size:16px;font-weight:bold;text-decoration:none;padding:14px 30px;border-radius:8px;margin-bottom:28px;">Activate Pro</a>
+  <div style="font-size:12px;line-height:1.6;color:#6c6c64;padding-bottom:24px;border-bottom:1px solid #d8d6cc;">Button not working? Paste this link into your browser:<br><a href="${link}" style="color:#6c6c64;word-break:break-all;">${link}</a></div>
+  <div style="padding-top:22px;font-size:14px;font-weight:bold;">&mdash; Thrain Support</div>
+  <img src="${proLogo}" width="62" alt="Blackout PDF Pro" style="display:block;border:0;margin-top:12px;">
+  <div style="padding-top:16px;font-size:12px;color:#6c6c64;">Blackout PDF &middot; <a href="${env.SITE_URL}" style="color:#6c6c64;">blackout.thrain.ai</a> &middot; support@thrain.ai</div>
+</td></tr>
+</table>
+</td></tr></table></body></html>`;
+}
+
 function corsHeaders(env) {
   return {
     "Access-Control-Allow-Origin": env.ALLOWED_ORIGIN || "*",
@@ -129,7 +152,8 @@ async function restore(env, body, ctx) {
             text:
               `Click to activate Blackout PDF Pro on this device:\n\n${link}\n\n` +
               `The link works on any device you open it on. Keep this email — ` +
-              `it's your license.\n`,
+              `it's your license.\n\n— Thrain Support\nblackout.thrain.ai\n`,
+            html: activationEmailHtml(env, link),
           }),
         });
       } catch {

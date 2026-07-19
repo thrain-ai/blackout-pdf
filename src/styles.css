@@ -480,15 +480,18 @@ a {
   transform: none;
 }
 
+/* On the dark card: plain amber, no offset shadow. */
 .tier.pro .btn {
   background: var(--amber);
   color: var(--ink);
-  box-shadow: 4px 4px 0 var(--paper);
+  box-shadow: none;
 }
 
 .tier.pro .btn:hover,
 .tier.pro .btn:focus-visible {
-  box-shadow: 2px 2px 0 var(--paper);
+  box-shadow: none;
+  transform: none;
+  filter: brightness(1.08);
 }
 
 .faq {
