@@ -1111,6 +1111,12 @@ footer a:hover {
     display: grid;
   }
 
+  /* The drag-to-draw tip is redundant on mobile — the ✏️ toggle IS the
+     affordance — and the badge crowds the small header. */
+  .info-badge {
+    display: none;
+  }
+
   .draw-toggle {
     display: block;
   }
