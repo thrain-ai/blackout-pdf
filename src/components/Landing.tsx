@@ -1,6 +1,8 @@
 import { useCallback, useRef, useState } from "react";
 import {
   PRODUCT_NAME,
+  COMPANY,
+  REPO_URL,
   FREE_PAGE_LIMIT,
   PRO_PRICE_LABEL,
   CHECKOUT_URL,
@@ -117,8 +119,14 @@ export default function Landing({ onFile, loading, error, pro }: Props) {
       <div className="pro-home">
         <header className="site-header">
           <div className="logo">
-            <span className="logo-mark" /> {PRODUCT_NAME}
-            <span className="pro-chip">PRO</span>
+            <span
+              className="logo-mark pro"
+              role="img"
+              aria-label={`${PRODUCT_NAME} Pro`}
+              title={`${PRODUCT_NAME} Pro`}
+            >
+              PRO
+            </span>
           </div>
         </header>
         <main className="pro-main">
@@ -137,11 +145,19 @@ export default function Landing({ onFile, loading, error, pro }: Props) {
     <div className="landing">
       <header className="site-header">
         <div className="logo">
-          <span className="logo-mark" /> {PRODUCT_NAME}
+          <span
+            className="logo-mark"
+            role="img"
+            aria-label={PRODUCT_NAME}
+            title={PRODUCT_NAME}
+          />
         </div>
         <nav>
           <a href="#pricing">Pricing</a>
           <a href="#faq">FAQ</a>
+          <a href={REPO_URL} target="_blank" rel="noreferrer">
+            GitHub
+          </a>
         </nav>
       </header>
 
@@ -156,12 +172,17 @@ export default function Landing({ onFile, loading, error, pro }: Props) {
         {error && <p className="error">{error}</p>}
 
         <p className="trust-row">
-          open source · works offline once loaded
+          <a href={REPO_URL} target="_blank" rel="noreferrer">
+            open source
+          </a>{" "}
+          · works offline once loaded
         </p>
         <p className="hover-tip">↑ psst — hover the black bars</p>
       </section>
 
-      <section className="steps">
+      <section className="steps-section">
+        <h2 className="steps-title">How to use</h2>
+        <div className="steps">
         <div>
           <h3>1 · Open</h3>
           <p>
@@ -183,6 +204,7 @@ export default function Landing({ onFile, loading, error, pro }: Props) {
             Your redacted copy downloads instantly. The blacked-out
             information is permanently removed — not just covered up.
           </p>
+        </div>
         </div>
       </section>
 
@@ -250,7 +272,13 @@ export default function Landing({ onFile, loading, error, pro }: Props) {
       <footer>
         <p>
           {PRODUCT_NAME} · true client-side PDF redaction ·{" "}
-          <a href={`mailto:${CONTACT_EMAIL}`}>contact</a>
+          <a href={`mailto:${CONTACT_EMAIL}`}>contact</a> ·{" "}
+          <a href={REPO_URL} target="_blank" rel="noreferrer">
+            source
+          </a>
+        </p>
+        <p className="copyright">
+          © {new Date().getFullYear()} {COMPANY}. All rights reserved.
         </p>
       </footer>
     </div>

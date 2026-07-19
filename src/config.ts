@@ -5,6 +5,10 @@
 
 export const PRODUCT_NAME = "Blackout PDF";
 
+export const COMPANY = "Thrain LLC";
+
+export const REPO_URL = "https://github.com/thrain-ai/blackout-pdf";
+
 // Pages allowed per export on the free tier.
 export const FREE_PAGE_LIMIT = 10;
 

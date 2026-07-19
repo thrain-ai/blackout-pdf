@@ -60,14 +60,18 @@ a {
   flex-direction: column;
 }
 
-.pro-chip {
+/* Pro variant of the mark: amber on top, ink shadow behind, PRO set inside. */
+.logo-mark.pro {
   background: var(--amber);
+  box-shadow: 5px 5px 0 var(--ink);
   color: var(--ink);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  padding: 3px 8px;
-  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
 }
 
 .pro-main {
@@ -102,20 +106,20 @@ a {
 }
 
 .logo {
-  font-weight: 800;
-  font-size: 18px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  letter-spacing: -0.01em;
+  gap: 12px;
 }
 
+/* The checkout-image mark: black bar, amber offset shadow, slight tilt. */
 .logo-mark {
-  width: 26px;
-  height: 13px;
+  width: 52px;
+  height: 24px;
   background: var(--ink);
   display: inline-block;
-  border-radius: 2px;
+  border-radius: 5px;
+  box-shadow: 5px 5px 0 var(--amber);
+  transform: rotate(-1.2deg);
 }
 
 .site-header nav a {
@@ -231,6 +235,63 @@ a {
 .dz-main {
   font-size: 20px;
   font-weight: 800;
+  position: relative;
+  padding-bottom: 4px;
+}
+
+/* Playful marker underline under "Drop a PDF": a short amber stroke that
+   glides back and forth beneath the text — eased, unevenly timed so it feels
+   hand-drawn rather than mechanical. A gentle "look here", not a strobe. */
+.dz-main::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 46%;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--amber);
+  transform: translateX(0) rotate(-0.3deg);
+  animation: underline-glide 5.2s cubic-bezier(0.45, 0, 0.25, 1) 1.1s infinite;
+}
+
+.dropzone:hover .dz-main::after {
+  animation-play-state: paused;
+}
+
+/* Irregular keyframe spacing = the "sort of random" bounce: quick sweep
+   right, small settle-back, pause, lazier return left, rest. */
+@keyframes underline-glide {
+  0% {
+    transform: translateX(0) rotate(-0.3deg);
+  }
+  22% {
+    transform: translateX(117%) rotate(0.3deg);
+  }
+  30% {
+    transform: translateX(106%) rotate(0.3deg);
+  }
+  48% {
+    transform: translateX(112%) rotate(0.3deg);
+  }
+  74% {
+    transform: translateX(4%) rotate(-0.3deg);
+  }
+  82% {
+    transform: translateX(9%) rotate(-0.3deg);
+  }
+  100% {
+    transform: translateX(0) rotate(-0.3deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dz-main::after {
+    animation: none;
+    left: -2%;
+    right: -2%;
+    width: auto;
+  }
 }
 
 .dz-sub {
@@ -256,13 +317,24 @@ a {
   font-size: 12.5px;
 }
 
+.steps-section {
+  border-top: 1px solid var(--line);
+  margin-top: 48px;
+  padding: 48px 0 56px;
+}
+
+.steps-title {
+  font-family: "Arial Black", "Helvetica Neue", ui-sans-serif, sans-serif;
+  font-weight: 900;
+  font-size: 27px;
+  letter-spacing: -0.015em;
+  margin-bottom: 26px;
+}
+
 .steps {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 22px;
-  padding: 56px 0;
-  border-top: 1px solid var(--line);
-  margin-top: 48px;
 }
 
 .steps h3 {
@@ -448,6 +520,27 @@ footer {
   font-size: 14px;
   border-top: 1px solid var(--line);
   padding-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.copyright {
+  font-size: 13px;
+}
+
+.trust-row a,
+footer a {
+  color: var(--muted);
+  text-decoration: underline;
+  text-decoration-color: var(--amber);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+.trust-row a:hover,
+footer a:hover {
+  color: var(--ink);
 }
 
 /* ---------- editor ---------- */
