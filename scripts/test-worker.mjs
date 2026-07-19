@@ -23,8 +23,20 @@ const privJwk = JSON.stringify(await crypto.subtle.exportKey("jwk", pair.private
 // --- mock Stripe -------------------------------------------------------------
 const PAID_SID = "cs_live_a1PAIDSESSION";
 const UNPAID_SID = "cs_live_a1UNPAIDSESSION";
+const sentEmails = [];
 const mock = createServer((req, res) => {
   res.setHeader("content-type", "application/json");
+  // Mock Resend: capture sends.
+  if (req.url === "/emails" && req.method === "POST") {
+    let body = "";
+    req.on("data", (c) => (body += c));
+    req.on("end", () => {
+      sentEmails.push(JSON.parse(body));
+      res.end(JSON.stringify({ id: "mock-email" }));
+    });
+    return;
+  }
+  // Mock Stripe below.
   if (req.headers.authorization !== "Bearer sk_test_mockkey") {
     res.statusCode = 401;
     return res.end(JSON.stringify({ error: { message: "bad key" } }));
@@ -40,6 +52,23 @@ const mock = createServer((req, res) => {
   }
   if (req.url === `/v1/checkout/sessions/${UNPAID_SID}`) {
     return res.end(JSON.stringify({ id: UNPAID_SID, payment_status: "unpaid" }));
+  }
+  // Sessions list filtered by buyer email (the payment-link-compatible
+  // restore path — no Customer object required).
+  if (req.url.startsWith("/v1/checkout/sessions?")) {
+    const q = new URL(req.url, "http://x").searchParams;
+    const email = q.get("customer_details[email]");
+    if (email === "buyer@example.com") {
+      return res.end(
+        JSON.stringify({
+          data: [
+            { id: "cs_live_a1OLDEXPIRED", payment_status: "unpaid" },
+            { id: PAID_SID, payment_status: "paid" },
+          ],
+        }),
+      );
+    }
+    return res.end(JSON.stringify({ data: [] }));
   }
   res.statusCode = 404;
   res.end(JSON.stringify({ error: { message: "No such checkout.session" } }));
@@ -120,6 +149,50 @@ ok("tampered token fails verification");
 res = await call("/restore", { email: "buyer@example.com" });
 if (res.status !== 501) fail("restore without email provider should be 501");
 ok("restore degrades gracefully without email provider");
+
+// 7. /restore with Resend configured: buyer email → activation email with a
+// VERIFIABLE token link (sessions queried by email — no Customer needed)
+const waits = [];
+const envMail = {
+  ...env,
+  RESEND_API_KEY: "re_mockkey",
+  RESEND_API_BASE: "http://127.0.0.1:9377",
+};
+const ctxMail = { waitUntil: (p) => waits.push(p) };
+res = await worker.fetch(
+  new Request("https://worker.test/restore", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email: "buyer@example.com" }),
+  }),
+  envMail,
+  ctxMail,
+);
+if (res.status !== 200) fail("restore for buyer should 200");
+await Promise.all(waits);
+if (sentEmails.length !== 1) fail(`expected 1 restore email, got ${sentEmails.length}`);
+const mail = sentEmails[0];
+if (mail.to[0] !== "buyer@example.com") fail("restore email went to wrong address");
+const tokenMatch = mail.text.match(/license_token=([^\s&]+)/);
+if (!tokenMatch) fail("restore email has no license_token link");
+if (!(await verify(decodeURIComponent(tokenMatch[1]))))
+  fail("restore email token does not verify");
+ok("buyer restore sends email with a verifiable activation link");
+
+// 8. /restore for a stranger: no email sent, same generic response
+res = await worker.fetch(
+  new Request("https://worker.test/restore", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email: "stranger@example.com" }),
+  }),
+  envMail,
+  ctxMail,
+);
+await Promise.all(waits);
+if (res.status !== 200) fail("stranger restore should still 200 (no enumeration)");
+if (sentEmails.length !== 1) fail("stranger should not receive an email");
+ok("non-buyer email gets no send, identical generic response");
 
 mock.close();
 console.log("\nWORKER TESTS PASS ✅");

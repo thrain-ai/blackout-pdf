@@ -98,40 +98,40 @@ async function restore(env, body, ctx) {
 
   // Do the lookup + send after responding, so response timing can't be used
   // to probe which emails have purchases.
+  //
+  // NOTE: query checkout sessions by customer_details[email], NOT the
+  // Customers list — payment-link checkouts often never create a Customer
+  // object, so a customer search finds nothing and no email ever sends.
   ctx.waitUntil(
     (async () => {
       try {
-        const customers = await stripeGet(
+        const sessions = await stripeGet(
           env,
-          `/v1/customers?email=${encodeURIComponent(email)}&limit=5`,
+          `/v1/checkout/sessions?customer_details[email]=${encodeURIComponent(email)}&limit=20`,
         );
-        for (const c of customers.data || []) {
-          const sessions = await stripeGet(
-            env,
-            `/v1/checkout/sessions?customer=${encodeURIComponent(c.id)}&limit=20`,
-          );
-          const paid = (sessions.data || []).find((s) => s.payment_status === "paid");
-          if (!paid) continue;
-          const token = await signToken(env, { e: email, s: paid.id, t: Date.now() });
-          const link = `${env.SITE_URL}/?license_token=${encodeURIComponent(token)}`;
-          await fetch("https://api.resend.com/emails", {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${env.RESEND_API_KEY}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              from: env.MAIL_FROM || "Blackout PDF <onboarding@resend.dev>",
-              to: [email],
-              subject: "Your Blackout PDF Pro activation link",
-              text:
-                `Click to activate Blackout PDF Pro on this device:\n\n${link}\n\n` +
-                `The link works on any device you open it on. Keep this email — ` +
-                `it's your license.\n`,
-            }),
-          });
-          return;
-        }
+        const paid = (sessions.data || []).find(
+          (s) => s.payment_status === "paid",
+        );
+        if (!paid) return;
+        const token = await signToken(env, { e: email, s: paid.id, t: Date.now() });
+        const link = `${env.SITE_URL}/?license_token=${encodeURIComponent(token)}`;
+        const resendBase = env.RESEND_API_BASE || "https://api.resend.com";
+        await fetch(`${resendBase}/emails`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${env.RESEND_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            from: env.MAIL_FROM || "Blackout PDF <onboarding@resend.dev>",
+            to: [email],
+            subject: "Your Blackout PDF Pro activation link",
+            text:
+              `Click to activate Blackout PDF Pro on this device:\n\n${link}\n\n` +
+              `The link works on any device you open it on. Keep this email — ` +
+              `it's your license.\n`,
+          }),
+        });
       } catch {
         // Swallow: the caller already got the generic response.
       }

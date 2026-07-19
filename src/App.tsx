@@ -37,8 +37,12 @@ export default function App() {
       setLoaded({ doc, filename: file.name });
     } catch (e) {
       console.error(e);
+      // Surface the underlying cause — "make sure it's a PDF" hid real
+      // browser-compat failures and made bug reports undiagnosable.
+      const detail =
+        e instanceof Error && e.message ? ` (${e.message})` : "";
       setError(
-        "Couldn't open that file. Make sure it's a PDF (password-protected PDFs aren't supported yet).",
+        `Couldn't open that file${detail}. Password-protected PDFs aren't supported yet — if this is a normal PDF, please email support with your browser version.`,
       );
     } finally {
       setLoading(false);
