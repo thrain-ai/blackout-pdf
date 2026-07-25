@@ -230,8 +230,22 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
     }),
     [filename, codeSet, doc.numPages],
   );
+  // Rebuild only when the log's content actually changes. `marks` is a fresh
+  // array on every interaction, so without this the log would be regenerated
+  // for edits it doesn't depend on (moving or adding an uncoded box).
+  const logSignature = useMemo(
+    () =>
+      marks
+        .filter((m) => m.marker !== null)
+        .map((m) => `${m.marker}:${m.pageIndex}:${m.code?.id ?? ""}`)
+        .join("|"),
+    [marks],
+  );
+  const marksRef = useRef(marks);
+  marksRef.current = marks;
+
   useEffect(() => {
-    if (!codesActive || codedCount === 0 || pages.length === 0) {
+    if (!codesActive || !logSignature || pages.length === 0) {
       setLogDoc((prev) => {
         prev?.destroy();
         return null;
@@ -242,7 +256,7 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
     let cancelled = false;
     const timer = setTimeout(async () => {
       try {
-        const bytes = await buildLogPreview(marks, logInfo, {
+        const bytes = await buildLogPreview(marksRef.current, logInfo, {
           width: pages[0].width,
           height: pages[0].height,
         });
@@ -269,7 +283,7 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [codesActive, codedCount, marks, logInfo, pages]);
+  }, [codesActive, logSignature, logInfo, pages]);
 
   const addTerm = () => {
     const t = termInput.trim();
@@ -664,6 +678,7 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
             maxWidth={pageMaxWidth}
             drawEnabled={drawEnabled}
             markerById={markerById}
+            scrollRoot={pagesRef.current}
           />
         ))}
 
@@ -683,6 +698,7 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
               drawEnabled={false}
               markerById={markerById}
               readOnly
+              scrollRoot={pagesRef.current}
               label={
                 logPages.length > 1
                   ? `Redaction log ${p.index + 1} of ${logPages.length} · appended on export`

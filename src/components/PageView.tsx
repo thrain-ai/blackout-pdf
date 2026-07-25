@@ -22,6 +22,11 @@ interface Props {
   readOnly?: boolean;
   // Overrides the "Page N" caption (the log preview names itself).
   label?: string;
+  // The scrolling container. IntersectionObserver's rootMargin applies to the
+  // root only — with the default (viewport) root an intervening scroll
+  // container clips it away, and pages would render only once already on
+  // screen. Passing the real scroller makes the pre-render margin work.
+  scrollRoot?: HTMLElement | null;
 }
 
 export default function PageView({
@@ -37,9 +42,11 @@ export default function PageView({
   markerById,
   readOnly = false,
   label,
+  scrollRoot,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
   const [drawing, setDrawing] = useState<Rect | null>(null);
   const dragStart = useRef<{ x: number; y: number } | null>(null);
 
@@ -47,7 +54,31 @@ export default function PageView({
   const cssW = page.width * displayScale;
   const cssH = page.height * displayScale;
 
+  // Canvases are the real memory cost in a long document — a letter page at 2x
+  // is ~15 MB of pixels, so eagerly rendering 100 pages would cost over a
+  // gigabyte. Only pages near the viewport keep one; the rest release theirs.
+  // Layout never shifts, because .page keeps its CSS size either way.
+  const [nearViewport, setNearViewport] = useState(false);
   useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => setNearViewport(entries.some((e) => e.isIntersecting)),
+      { root: scrollRoot ?? null, rootMargin: "1200px 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [scrollRoot]);
+
+  useEffect(() => {
+    if (!nearViewport) {
+      const idle = canvasRef.current;
+      if (idle && idle.width) {
+        idle.width = 0;
+        idle.height = 0;
+      }
+      return;
+    }
     let task: RenderTask | null = null;
     let cancelled = false;
     (async () => {
@@ -55,18 +86,39 @@ export default function PageView({
       if (cancelled || !canvasRef.current) return;
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       const viewport = p.getViewport({ scale: displayScale * dpr });
-      const canvas = canvasRef.current;
-      canvas.width = Math.floor(viewport.width);
-      canvas.height = Math.floor(viewport.height);
-      const ctx = canvas.getContext("2d", { alpha: false })!;
-      task = p.render({ canvasContext: ctx, viewport });
+      const w = Math.floor(viewport.width);
+      const h = Math.floor(viewport.height);
+
+      // Render offscreen, then blit in a single operation. Painting straight
+      // into the visible canvas made re-renders flash: resizing an opaque
+      // canvas resets it to BLACK, and pdf.js draws page content only, so the
+      // page was briefly black (and could keep stale pixels). Compositing an
+      // already-finished frame makes both impossible rather than unlikely —
+      // which matters because the log preview re-renders on every code change.
+      const off = document.createElement("canvas");
+      off.width = w;
+      off.height = h;
+      const octx = off.getContext("2d", { alpha: false })!;
+      octx.fillStyle = "#ffffff";
+      octx.fillRect(0, 0, w, h);
+      task = p.render({ canvasContext: octx, viewport });
       await task.promise.catch(() => {});
+      if (cancelled || !canvasRef.current) return;
+
+      const canvas = canvasRef.current;
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+      }
+      canvas.getContext("2d", { alpha: false })!.drawImage(off, 0, 0);
+      off.width = 0;
+      off.height = 0;
     })();
     return () => {
       cancelled = true;
       task?.cancel();
     };
-  }, [doc, page.index, displayScale]);
+  }, [doc, page.index, displayScale, nearViewport]);
 
   // Pointer coords → scale-1 page coords.
   const toPage = (e: React.PointerEvent): { x: number; y: number } => {
@@ -118,7 +170,7 @@ export default function PageView({
 
   if (readOnly) {
     return (
-      <div className="page-wrap" style={{ width: cssW }}>
+      <div className="page-wrap" ref={wrapRef} style={{ width: cssW }}>
         <div className="page-label log">{label ?? `Page ${page.index + 1}`}</div>
         <div className="page" style={{ width: cssW, height: cssH }}>
           <canvas ref={canvasRef} style={{ width: cssW, height: cssH }} />
@@ -128,7 +180,7 @@ export default function PageView({
   }
 
   return (
-    <div className="page-wrap" style={{ width: cssW }}>
+    <div className="page-wrap" ref={wrapRef} style={{ width: cssW }}>
       <div className="page-label">{label ?? `Page ${page.index + 1}`}</div>
       <div className="page" style={{ width: cssW, height: cssH }}>
         <canvas ref={canvasRef} style={{ width: cssW, height: cssH }} />

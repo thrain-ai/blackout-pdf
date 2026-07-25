@@ -146,7 +146,41 @@ try {
   if (!/Redaction log/.test(logLabel)) fail("log preview label wrong: " + logLabel);
   ok(`log page previewed in the editor ("${logLabel.trim()}")`);
 
-  // Second set: switching to litigation and re-applying recodes everything.
+  // Second set: switching to litigation and re-applying recodes everything —
+  // and, because that rebuilds the log, it's also the moment to prove the
+  // preview never flashes black. An opaque canvas resets to black when
+  // resized, which is exactly the regression being guarded here.
+  await page.evaluate(() => {
+    const wrap = [...document.querySelectorAll(".page-wrap")].find((w) =>
+      w.querySelector(".page-label.log"),
+    );
+    wrap.scrollIntoView({ block: "center" });
+    const canvas = wrap.querySelector("canvas");
+    // Mean brightness of the WHOLE page (downscaled), not a single patch: a
+    // mostly-white document page sits near 250, and any black/dark frame drags
+    // the mean down unmistakably.
+    const probe = document.createElement("canvas");
+    probe.width = 24;
+    probe.height = 24;
+    const pctx = probe.getContext("2d");
+    window.__lum = [];
+    const tick = () => {
+      try {
+        if (!canvas.width) throw new Error("released");
+        pctx.clearRect(0, 0, 24, 24);
+        pctx.drawImage(canvas, 0, 0, 24, 24);
+        const d = pctx.getImageData(0, 0, 24, 24).data;
+        let sum = 0;
+        for (let i = 0; i < d.length; i += 4) sum += (d[i] + d[i + 1] + d[i + 2]) / 3;
+        window.__lum.push(sum / (d.length / 4));
+      } catch {
+        window.__lum.push(-1);
+      }
+      if (window.__lum.length < 200) requestAnimationFrame(tick);
+    };
+    tick();
+  });
+
   await page.evaluate(() => {
     [...document.querySelectorAll(".seg-btn")]
       .find((b) => /Litigation/.test(b.textContent))
@@ -159,7 +193,21 @@ try {
     );
     btn.click();
   });
-  await new Promise((r) => setTimeout(r, 400));
+  await new Promise((r) => setTimeout(r, 1800));
+
+  const lum = await page.evaluate(() => window.__lum);
+  const usable = lum.filter((v) => v >= 0);
+  if (usable.length < 20)
+    fail(`only ${usable.length} luminance samples — flash check inconclusive`);
+  const darkest = Math.min(...usable);
+  const typical = usable.reduce((a, b) => a + b, 0) / usable.length;
+  if (darkest < 180)
+    fail(
+      `log preview flashed dark during rebuild (min ${darkest.toFixed(0)}/255, typical ${typical.toFixed(0)})`,
+    );
+  ok(
+    `log rebuild never flashes dark (${usable.length} frames, min ${darkest.toFixed(0)}/255, typical ${typical.toFixed(0)})`,
+  );
   const litBadges = await page.$$eval(".code-badge", (els) =>
     els.map((e) => e.textContent),
   );
