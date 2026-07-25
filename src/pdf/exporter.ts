@@ -2,6 +2,7 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import type { PDFFont, PDFPage, RGB } from "pdf-lib";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import type { RedactionMark } from "./marks.ts";
+import { pdfPlatform } from "./platform.ts";
 
 // Export strategy: rasterize every page and burn the black bars into the
 // pixels, then rebuild a fresh PDF from the images. The original text layer is
@@ -361,6 +362,7 @@ export async function exportRedacted(
   opts: ExportOptions = {},
 ): Promise<Uint8Array> {
   const out = await PDFDocument.create();
+  const platform = pdfPlatform();
   const total = doc.numPages;
   const byPage = new Map<number, RedactionMark[]>();
   for (const m of marks) {
@@ -372,14 +374,18 @@ export async function exportRedacted(
   for (let i = 0; i < total; i++) {
     const page = await doc.getPage(i + 1);
     const viewport = page.getViewport({ scale: EXPORT_SCALE });
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.floor(viewport.width);
-    canvas.height = Math.floor(viewport.height);
-    const ctx = canvas.getContext("2d", { alpha: false })!;
+    const canvas = platform.createCanvas(
+      Math.floor(viewport.width),
+      Math.floor(viewport.height),
+    );
+    const ctx = canvas.ctx;
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    await page.render({ canvasContext: ctx, viewport }).promise;
+    await page.render({
+      canvasContext: ctx as unknown as CanvasRenderingContext2D,
+      viewport,
+    }).promise;
 
     for (const m of byPage.get(i) ?? []) {
       const x = m.rect.x * EXPORT_SCALE;
@@ -410,14 +416,7 @@ export async function exportRedacted(
       }
     }
 
-    const blob = await new Promise<Blob>((resolve, reject) =>
-      canvas.toBlob(
-        (b) => (b ? resolve(b) : reject(new Error("canvas.toBlob failed"))),
-        "image/jpeg",
-        0.92,
-      ),
-    );
-    const jpg = await out.embedJpg(await blob.arrayBuffer());
+    const jpg = await out.embedJpg(await canvas.encodeJpeg(0.92));
 
     const base = page.getViewport({ scale: 1 });
     if (i === 0) firstSize = { width: base.width, height: base.height };
@@ -425,8 +424,7 @@ export async function exportRedacted(
     outPage.drawImage(jpg, { x: 0, y: 0, width: base.width, height: base.height });
 
     // Free canvas memory promptly on large docs.
-    canvas.width = 0;
-    canvas.height = 0;
+    canvas.release();
     opts.onProgress?.(i + 1, total);
   }
 
@@ -459,14 +457,4 @@ export async function buildLogPreview(
   appendLog(out, marks, info, size, fonts);
   if (out.getPageCount() === 0) out.addPage([size.width, size.height]);
   return out.save();
-}
-
-export function downloadBytes(bytes: Uint8Array, filename: string) {
-  const blob = new Blob([bytes as BlobPart], { type: "application/pdf" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }

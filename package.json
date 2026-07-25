@@ -7,7 +7,12 @@
     "dev": "vite",
     "build": "tsc -b && vite build && node scripts/prerender.mjs",
     "build:nossr": "tsc -b && vite build",
-    "preview": "vite preview"
+    "build:agent": "tsc -p tsconfig.node.json && node scripts/build-agent.mjs",
+    "preview": "vite preview",
+    "smoke": "node scripts/smoke.mjs",
+    "smoke:cli": "node scripts/smoke-cli.mjs",
+    "smoke:mcp": "node scripts/smoke-mcp.mjs",
+    "smoke:agent-dist": "node scripts/smoke-cli.mjs packages/blackout/dist/cli.mjs && node scripts/smoke-mcp.mjs packages/blackout-mcp/dist/mcp.mjs"
   },
   "dependencies": {
     "pdf-lib": "^1.17.1",
@@ -16,11 +21,15 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@napi-rs/canvas": "^0.1.100",
+    "@types/node": "^26.1.1",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
     "puppeteer-core": "^25.3.0",
     "typescript": "^5.7.2",
-    "vite": "^6.0.7"
+    "vite": "^6.0.7",
+    "zod": "^4.4.3"
   }
 }

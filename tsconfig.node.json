@@ -1,0 +1,23 @@
+{
+  // Type-checks the Node side: the platform adapter, the CLI and the MCP
+  // server, plus the shared engine they pull in. DOM lib stays on because the
+  // engine's canvas interface is written against the DOM's own signatures —
+  // it is types only, and nothing here touches a real document.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "types": ["node"]
+  },
+  "include": ["src/agent", "src/platform/node.ts", "src/pdf", "src/config.ts", "src/licenseVerify.ts"]
+}

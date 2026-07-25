@@ -14,7 +14,14 @@
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    // The browser build must not see @types/node. Without this, adding node
+    // types for the CLI would silently change what `setTimeout` returns in the
+    // web app. vite/client still arrives via the reference in vite-env.d.ts.
+    "types": []
   },
-  "include": ["src"]
+  "include": ["src"],
+  // Node-only code is type-checked by tsconfig.node.json, which has the node
+  // types this config deliberately withholds.
+  "exclude": ["src/platform/node.ts", "src/agent"]
 }
