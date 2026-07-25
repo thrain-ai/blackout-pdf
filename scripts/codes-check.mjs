@@ -131,6 +131,8 @@ try {
     fail("log page missing the stated basis for withholding");
   if (!/Prepared with Blackout/.test(log)) fail("log page missing the footer");
   if (!squashed.includes("BASISFORWITHHOLDING")) fail("log index header missing");
+  if (!/not legal advice/.test(log) || !/preparer remains responsible/.test(log))
+    fail("log page missing the closing disclaimer");
   ok("log page is selectable text with codes, bases, heading and footer");
 
   const logMarkers = (log.match(/\b\d+\b/g) ?? []).map(Number);

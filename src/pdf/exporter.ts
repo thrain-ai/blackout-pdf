@@ -55,6 +55,38 @@ function sanitize(text: string): string {
   return text.replace(/[^\x20-\x7E\xA0-\xFF]/g, "?");
 }
 
+// Printed at the end of the log. The tool applies whatever code the operator
+// chose; it can't judge whether that citation is the right one, and saying so
+// plainly is both honest and protective.
+const LOG_DISCLAIMER =
+  "This log was generated automatically from the redactions applied in Blackout. " +
+  "The code descriptions above are abbreviated summaries of the cited authority, " +
+  "not legal advice. The preparer remains responsible for verifying that each " +
+  "redaction is correct and complete, and that the exemption or category cited " +
+  "for it is the appropriate one.";
+
+/** Greedy word wrap — pdf-lib draws single lines only. */
+function wrapText(
+  text: string,
+  font: PDFFont,
+  size: number,
+  maxWidth: number,
+): string[] {
+  const lines: string[] = [];
+  let line = "";
+  for (const word of sanitize(text).split(/\s+/)) {
+    const candidate = line ? `${line} ${word}` : word;
+    if (font.widthOfTextAtSize(candidate, size) <= maxWidth) {
+      line = candidate;
+    } else {
+      if (line) lines.push(line);
+      line = word;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
 function fit(text: string, font: PDFFont, size: number, maxWidth: number): string {
   const clean = sanitize(text);
   if (font.widthOfTextAtSize(clean, size) <= maxWidth) return clean;
@@ -215,6 +247,28 @@ function appendLog(
       },
     });
   }
+
+  // Closing note. Added as a row so pagination carries it to a new page if the
+  // index fills this one, rather than colliding with the footer.
+  const noteLines = wrapText(LOG_DISCLAIMER, regular, 7.5, contentW);
+  rows.push({
+    height: 30 + noteLines.length * 9.5,
+    draw: (page, y) => {
+      rule(page, MARGIN, y + 10, contentW, 0.4, HAIRLINE);
+      drawTracked(page, "NOTE", MARGIN, y - 4, {
+        font: bold, size: 7, color: MUTED, tracking: 1.4,
+      });
+      noteLines.forEach((line, i) =>
+        page.drawText(line, {
+          x: MARGIN,
+          y: y - 18 - i * 9.5,
+          size: 7.5,
+          font: regular,
+          color: MUTED,
+        }),
+      );
+    },
+  });
 
   // --- pagination ---------------------------------------------------------
   const HEADER_FIRST = 132;
