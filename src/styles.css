@@ -702,19 +702,26 @@ footer a:hover {
   overflow-y: auto;
 }
 
-/* Fixed columns keep the code chips and page labels in true columns. */
-.category li label {
+/* Fixed columns keep the code pickers and page labels in true columns. */
+.category li.match-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) 46px;
+  grid-template-columns: minmax(0, 1fr) 46px;
   align-items: center;
   gap: 6px;
   font-size: 13px;
   padding: 4px 0;
-  cursor: pointer;
 }
 
-.categories.coded .category li label {
-  grid-template-columns: auto minmax(0, 1fr) 66px 46px;
+.categories.coded .category li.match-row {
+  grid-template-columns: minmax(0, 1fr) 74px 46px;
+}
+
+.match-hit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  cursor: pointer;
 }
 
 .match-main {
@@ -999,7 +1006,8 @@ footer a:hover {
 
 /* Quiet neutral chip in a fixed grid column, so codes form a clean column
    instead of ragged tags. */
-.code-badge {
+.code-badge,
+.code-select {
   display: block;
   background: var(--paper-deep);
   color: var(--ink-soft);
@@ -1013,6 +1021,24 @@ footer a:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Editable in place: the chip IS the picker, so a row looks identical until
+   someone needs the exception. */
+.code-select {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  font-family: inherit;
+  text-align-last: center;
+  cursor: pointer;
+}
+
+.code-select:hover,
+.code-select:focus {
+  border-color: var(--ink);
+  color: var(--ink);
+  outline: none;
 }
 
 /* The marker figure on a bar — mirrors what the export burns in. */
@@ -1316,7 +1342,7 @@ footer a:hover {
   }
 
   /* Comfortable touch targets in the sheet. */
-  .category li label {
+  .category li.match-row {
     padding: 7px 0;
   }
 

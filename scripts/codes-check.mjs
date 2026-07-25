@@ -97,11 +97,36 @@ try {
     fail(`markers are not a 1..N sequence: ${markers.join(",")}`);
   ok(`${markers.length} markers numbered 1..${markers.length} in the editor`);
 
-  const badges = await page.$$eval(".code-badge", (els) =>
-    els.map((e) => e.textContent),
-  );
-  if (!badges.includes("(b)(6)")) fail(`expected a (b)(6) badge, got ${badges}`);
+  const codes = await page.$$eval(".code-select", (els) => els.map((e) => e.value));
+  if (!codes.includes("foia:b6"))
+    fail(`expected the FOIA privacy code on detected PII, got ${codes}`);
   ok("auto-mapped FOIA code (b)(6) shown on detected PII");
+
+  // Per-row override: change one row's code without touching its neighbours,
+  // and without the click toggling the redaction off.
+  const rowCodes = () =>
+    page.$$eval(".code-select", (els) => els.map((e) => e.value));
+  const before = await rowCodes();
+  if (before.length < 2) fail("expected several coded rows to test overrides");
+  const target = await page.$(".code-select");
+  await target.select("foia:b7c");
+  await new Promise((r) => setTimeout(r, 400));
+  const after = await rowCodes();
+  if (after[0] !== "foia:b7c") fail(`override did not apply: ${after[0]}`);
+  if (after.slice(1).join() !== before.slice(1).join())
+    fail("override leaked into other rows");
+  const stillRedacted = await page.$$eval(
+    ".category input[type=checkbox]",
+    (els) => els.every((e) => e.checked),
+  );
+  if (!stillRedacted) fail("using the code picker toggled the redaction off");
+  const markersAfter = await page.$$eval(".box-marker", (els) => els.length);
+  if (markersAfter === 0) fail("markers disappeared after override");
+  ok("per-row override applies to one row only, without un-redacting it");
+
+  // Put it back so the export assertions below see a uniform document.
+  await target.select("foia:b6");
+  await new Promise((r) => setTimeout(r, 400));
 
   // Export and read the result back.
   const dlDir = mkdtempSync(join(tmpdir(), "blackout-codes-"));
@@ -210,11 +235,9 @@ try {
   ok(
     `log rebuild never flashes dark (${usable.length} frames, min ${darkest.toFixed(0)}/255, typical ${typical.toFixed(0)})`,
   );
-  const litBadges = await page.$$eval(".code-badge", (els) =>
-    els.map((e) => e.textContent),
-  );
-  if (!litBadges.includes("SSN/TIN"))
-    fail(`litigation recode failed, badges: ${litBadges}`);
+  const litCodes = await page.$$eval(".code-select", (els) => els.map((e) => e.value));
+  if (!litCodes.includes("litigation:ssn"))
+    fail(`litigation recode failed, codes: ${litCodes}`);
   ok("switching to the litigation set recodes redactions (SSN/TIN)");
 
   if (errors.length) fail("page errors: " + errors.join(" | "));

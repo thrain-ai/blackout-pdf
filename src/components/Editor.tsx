@@ -153,6 +153,21 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
     [codeIdFor],
   );
 
+  /**
+   * Override the code on one sidebar row. Rows group every instance of the
+   * same text, so this sets all of them — which is nearly always the intent,
+   * and a single-instance exception can still be handled on the page itself.
+   */
+  const setCodeForGroup = useCallback((ids: string[], codeId: string | null) => {
+    setSuggestions((prev) =>
+      prev.map((s) => {
+        if (!ids.includes(s.id)) return s;
+        acceptedState.current.set(suggestionKey(s), codeId);
+        return { ...s, codeId };
+      }),
+    );
+  }, []);
+
   /** Retro-apply the current code selection to everything already redacted. */
   const applyCodeToAll = useCallback(() => {
     setSuggestions((prev) =>
@@ -485,8 +500,11 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
                             ...new Set(group.map((s) => s.pageIndex)),
                           ].sort((a, b) => a - b);
                           return (
-                            <li key={group[0].id}>
-                              <label>
+                            <li className="match-row" key={group[0].id}>
+                              {/* The checkbox label wraps only the hit text, so
+                                  operating the code picker doesn't toggle the
+                                  redaction. */}
+                              <label className="match-hit">
                                 <input
                                   type="checkbox"
                                   checked={allOn}
@@ -510,29 +528,74 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
                                     </span>
                                   )}
                                 </span>
-                                {codesActive && (
-                                  <span className="code-cell">
-                                    {(() => {
-                                      if (!allOn) return null;
+                              </label>
+                              {codesActive && (
+                                <span className="code-cell">
+                                  {allOn &&
+                                    (() => {
                                       const ids = new Set(
                                         group.map((s) => s.codeId ?? ""),
                                       );
-                                      if (ids.size !== 1) return null;
-                                      const c = codeById([...ids][0]);
-                                      return c ? (
-                                        <span className="code-badge">
-                                          {c.label}
-                                        </span>
-                                      ) : null;
+                                      const mixed = ids.size > 1;
+                                      const sharedId = mixed
+                                        ? null
+                                        : ([...ids][0] || null);
+                                      const shared = codeById(sharedId);
+                                      // A code set from the other authority
+                                      // still has to display correctly.
+                                      const foreign =
+                                        shared &&
+                                        !codeSet.codes.some(
+                                          (c) => c.id === shared.id,
+                                        );
+                                      return (
+                                        <select
+                                          className="code-select"
+                                          aria-label={`Exemption code for ${group[0].text}`}
+                                          title={
+                                            shared
+                                              ? `${shared.label} — ${shared.basis}`
+                                              : "No code — choose one"
+                                          }
+                                          value={
+                                            mixed ? "__mixed" : (sharedId ?? "")
+                                          }
+                                          onChange={(e) => {
+                                            if (e.target.value === "__mixed") return;
+                                            setCodeForGroup(
+                                              group.map((s) => s.id),
+                                              e.target.value || null,
+                                            );
+                                          }}
+                                        >
+                                          {mixed && (
+                                            <option value="__mixed">Mixed</option>
+                                          )}
+                                          <option value="">—</option>
+                                          {foreign && shared && (
+                                            <option value={shared.id}>
+                                              {shared.label}
+                                            </option>
+                                          )}
+                                          {codeSet.codes.map((c) => (
+                                            <option
+                                              key={c.id}
+                                              value={c.id}
+                                              title={c.basis}
+                                            >
+                                              {c.label}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      );
                                     })()}
-                                  </span>
-                                )}
-                                <span className="match-page">
-                                  {pages.length === 1
-                                    ? `Page ${pages[0] + 1}`
-                                    : `${pages.length} pages`}
                                 </span>
-                              </label>
+                              )}
+                              <span className="match-page">
+                                {pages.length === 1
+                                  ? `Page ${pages[0] + 1}`
+                                  : `${pages.length} pages`}
+                              </span>
                             </li>
                           );
                         })}
