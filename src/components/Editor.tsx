@@ -4,6 +4,14 @@ import type { ManualBox, Rect, Suggestion, PageInfo } from "../pdf/types.ts";
 import { findSuggestions } from "../pdf/textSearch.ts";
 import { exportRedacted, downloadBytes } from "../pdf/exporter.ts";
 import { PATTERNS, CUSTOM_PATTERN_ID } from "../pdf/patterns.ts";
+import {
+  CODE_SETS,
+  DEFAULT_CODE_SET_ID,
+  codeById,
+  codeSetById,
+  resolveCode,
+} from "../pdf/codes.ts";
+import { orderAndNumber, type MarkInput } from "../pdf/marks.ts";
 import { FREE_PAGE_LIMIT } from "../config.ts";
 import PageView from "./PageView.tsx";
 import UpgradeModal from "./UpgradeModal.tsx";
@@ -35,7 +43,25 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
   const [scanning, setScanning] = useState(true);
   const [exporting, setExporting] = useState<null | { done: number; total: number }>(null);
   const [showUpgrade, setShowUpgrade] = useState(false);
-  const acceptedKeys = useRef(new Set<string>());
+  // Accepted suggestions survive a re-scan (adding a custom term rescans the
+  // document), and so must their assigned codes: key -> codeId (null = coded
+  // as nothing).
+  const acceptedState = useRef(new Map<string, string | null>());
+
+  // --- exemption codes (Pro) ----------------------------------------------
+  const [codeSetId, setCodeSetId] = useState(DEFAULT_CODE_SET_ID);
+  const [pinnedCodeId, setPinnedCodeId] = useState<string | null>(null);
+  const codeSet = useMemo(() => codeSetById(codeSetId), [codeSetId]);
+
+  // The code a redaction takes when it's applied: a pinned code wins,
+  // otherwise the set's mapping for that detected category.
+  const codeIdFor = useCallback(
+    (categoryId?: string): string | null => {
+      if (!pro) return null;
+      return resolveCode(codeSet, pinnedCodeId, categoryId)?.id ?? null;
+    },
+    [pro, codeSet, pinnedCodeId],
+  );
 
   // --- mobile adaptations -------------------------------------------------
   // Coarse pointer = touch device: drags scroll by default, drawing is an
@@ -77,7 +103,11 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
         found.push(...s);
       }
       for (const s of found) {
-        if (acceptedKeys.current.has(suggestionKey(s))) s.accepted = true;
+        const key = suggestionKey(s);
+        if (acceptedState.current.has(key)) {
+          s.accepted = true;
+          s.codeId = acceptedState.current.get(key) ?? null;
+        }
       }
       setPages(infos);
       setSuggestions(found);
@@ -88,22 +118,47 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
     };
   }, [doc, customTerms]);
 
-  const setAccepted = useCallback((ids: string[], accepted: boolean) => {
+  const setAccepted = useCallback(
+    (ids: string[], accepted: boolean) => {
+      setSuggestions((prev) =>
+        prev.map((s) => {
+          if (!ids.includes(s.id)) return s;
+          const key = suggestionKey(s);
+          if (!accepted) {
+            acceptedState.current.delete(key);
+            return { ...s, accepted: false, codeId: null };
+          }
+          const codeId = codeIdFor(s.categoryId);
+          acceptedState.current.set(key, codeId);
+          return { ...s, accepted: true, codeId };
+        }),
+      );
+    },
+    [codeIdFor],
+  );
+
+  const addManualBox = useCallback(
+    (pageIndex: number, rect: Rect) => {
+      setManualBoxes((prev) => [
+        ...prev,
+        { id: `m${boxId++}`, pageIndex, rect, codeId: codeIdFor() },
+      ]);
+    },
+    [codeIdFor],
+  );
+
+  /** Retro-apply the current code selection to everything already redacted. */
+  const applyCodeToAll = useCallback(() => {
     setSuggestions((prev) =>
       prev.map((s) => {
-        if (!ids.includes(s.id)) return s;
-        const next = { ...s, accepted };
-        const key = suggestionKey(s);
-        if (accepted) acceptedKeys.current.add(key);
-        else acceptedKeys.current.delete(key);
-        return next;
+        if (!s.accepted) return s;
+        const codeId = codeIdFor(s.categoryId);
+        acceptedState.current.set(suggestionKey(s), codeId);
+        return { ...s, codeId };
       }),
     );
-  }, []);
-
-  const addManualBox = useCallback((pageIndex: number, rect: Rect) => {
-    setManualBoxes((prev) => [...prev, { id: `m${boxId++}`, pageIndex, rect }]);
-  }, []);
+    setManualBoxes((prev) => prev.map((b) => ({ ...b, codeId: codeIdFor() })));
+  }, [codeIdFor]);
 
   const removeManualBox = useCallback((id: string) => {
     setManualBoxes((prev) => prev.filter((b) => b.id !== id));
@@ -122,6 +177,39 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
   const acceptedCount =
     suggestions.filter((s) => s.accepted).length + manualBoxes.length;
 
+  // Single source of truth for redactions in reading order, with marker
+  // numbers — the overlay and the exported log both read from this, so the
+  // figure on a bar always matches the figure in the log.
+  const marks = useMemo(() => {
+    const inputs: MarkInput[] = [];
+    for (const s of suggestions) {
+      if (!s.accepted) continue;
+      inputs.push({
+        id: s.id,
+        pageIndex: s.pageIndex,
+        rect: s.rect,
+        code: pro ? codeById(s.codeId) : null,
+      });
+    }
+    for (const b of manualBoxes) {
+      inputs.push({
+        id: b.id,
+        pageIndex: b.pageIndex,
+        rect: b.rect,
+        code: pro ? codeById(b.codeId) : null,
+      });
+    }
+    return orderAndNumber(inputs);
+  }, [suggestions, manualBoxes, pro]);
+
+  const markerById = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const mark of marks) if (mark.marker !== null) m.set(mark.id, mark.marker);
+    return m;
+  }, [marks]);
+
+  const codedCount = markerById.size;
+
   const addTerm = () => {
     const t = termInput.trim();
     if (t.length >= 2 && !customTerms.includes(t)) {
@@ -137,17 +225,18 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
     }
     setExporting({ done: 0, total: doc.numPages });
     try {
-      const byPage = new Map<number, Rect[]>();
-      for (const s of suggestions) {
-        if (!s.accepted) continue;
-        byPage.set(s.pageIndex, [...(byPage.get(s.pageIndex) ?? []), s.rect]);
-      }
-      for (const b of manualBoxes) {
-        byPage.set(b.pageIndex, [...(byPage.get(b.pageIndex) ?? []), b.rect]);
-      }
-      const bytes = await exportRedacted(doc, byPage, (done, total) =>
-        setExporting({ done, total }),
-      );
+      const bytes = await exportRedacted(doc, marks, {
+        onProgress: (done, total) => setExporting({ done, total }),
+        log:
+          codedCount > 0
+            ? {
+                filename,
+                codeSetName: codeSet.name,
+                authority: codeSet.authority,
+                sourcePageCount: doc.numPages,
+              }
+            : null,
+      });
       downloadBytes(bytes, filename.replace(/\.pdf$/i, "") + "-redacted.pdf");
     } catch (e) {
       console.error(e);
@@ -195,6 +284,65 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
           {doc.numPages} page{doc.numPages === 1 ? "" : "s"}
           {scanning ? " · scanning…" : ""}
         </p>
+
+        <div className={`codes-panel${pro ? "" : " locked"}`}>
+          <div className="cat-head">
+            <span>Exemption codes</span>
+            {!pro && <span className="pro-tag">PRO</span>}
+          </div>
+          {pro ? (
+            <>
+              <select
+                aria-label="Code set"
+                value={codeSetId}
+                onChange={(e) => {
+                  setCodeSetId(e.target.value);
+                  setPinnedCodeId(null);
+                }}
+              >
+                {CODE_SETS.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+              <select
+                aria-label="Code to apply"
+                value={pinnedCodeId ?? ""}
+                onChange={(e) => setPinnedCodeId(e.target.value || null)}
+              >
+                <option value="">Auto by type</option>
+                {codeSet.codes.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.label} — {c.basis}
+                  </option>
+                ))}
+              </select>
+              <button
+                className="mini-btn"
+                disabled={acceptedCount === 0}
+                onClick={applyCodeToAll}
+              >
+                Apply to all
+              </button>
+              <p className="meta">
+                {codedCount > 0
+                  ? `${codedCount} coded — numbered markers and a log page are appended on export.`
+                  : "Redactions you apply get a code, a numbered marker, and a log entry."}
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="meta">
+                Cite FOIA exemptions or privilege categories on every redaction,
+                with numbered markers and an appended log page.
+              </p>
+              <button className="link-btn" onClick={() => setShowUpgrade(true)}>
+                Unlock with Pro
+              </button>
+            </>
+          )}
+        </div>
 
         <div className="categories">
           {[...PATTERNS.map((p) => p.id), CUSTOM_PATTERN_ID].map((cat) => {
@@ -257,6 +405,17 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
                                 <span className="match-text">
                                   {group[0].text}
                                 </span>
+                                {(() => {
+                                  if (!pro || !allOn) return null;
+                                  const ids = new Set(
+                                    group.map((s) => s.codeId ?? ""),
+                                  );
+                                  if (ids.size !== 1) return null;
+                                  const c = codeById([...ids][0]);
+                                  return c ? (
+                                    <span className="code-badge">{c.label}</span>
+                                  ) : null;
+                                })()}
                                 {group.length > 1 && (
                                   <span className="match-count">
                                     ×{group.length}
@@ -412,6 +571,7 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
             onRemoveBox={removeManualBox}
             maxWidth={pageMaxWidth}
             drawEnabled={drawEnabled}
+            markerById={markerById}
           />
         ))}
       </main>

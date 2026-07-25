@@ -50,6 +50,10 @@ const FAQ: FaqEntry[] = [
     a: "Social Security numbers, email addresses, phone numbers, and credit card numbers. You can also search for any custom word or name, and draw redaction boxes anywhere by hand.",
   },
   {
+    q: "Can I cite FOIA exemptions or privilege codes?",
+    a: "Yes, with Pro. Pick the FOIA exemption set or the litigation and privilege set, and every redaction carries a code. Because a code like (b)(7)(C) can't fit legibly inside a one-line black bar, Blackout puts a small numbered marker on each bar and appends a redaction log that lists every marker with its code and the stated basis for withholding — the way professional releases are prepared.",
+  },
+  {
     q: "Does it work on scanned PDFs?",
     a: "Automatic detection works on PDFs with selectable text (if you can highlight the words, it works). For scans that are essentially photos of paper, automatic search can't read them — but you can still draw redaction boxes anywhere by hand, on any PDF.",
   },
@@ -259,6 +263,8 @@ export default function Landing({ onFile, loading, error, pro }: Props) {
             </p>
             <ul>
               <li>Unlimited pages</li>
+              <li>FOIA &amp; privilege exemption codes</li>
+              <li>Numbered markers + redaction log page</li>
               <li>Everything in Free</li>
               <li>Lifetime updates</li>
               <li>Priority email support</li>

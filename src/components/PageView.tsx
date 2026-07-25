@@ -15,6 +15,9 @@ interface Props {
   // When false (touch devices with draw mode off), drags scroll instead of
   // drawing redaction boxes.
   drawEnabled: boolean;
+  // Marker numbers for coded redactions, keyed by suggestion/box id — the
+  // same figures the export burns onto the bars.
+  markerById: Map<string, number>;
 }
 
 export default function PageView({
@@ -27,6 +30,7 @@ export default function PageView({
   onRemoveBox,
   maxWidth,
   drawEnabled,
+  markerById,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -129,7 +133,11 @@ export default function PageView({
                   : `Suggested: ${s.text} (click to redact)`
               }
               onClick={() => onToggleSuggestion(s.id, !s.accepted)}
-            />
+            >
+              {markerById.has(s.id) && (
+                <span className="box-marker">{markerById.get(s.id)}</span>
+              )}
+            </div>
           ))}
           {manualBoxes.map((b) => (
             <div
@@ -138,7 +146,11 @@ export default function PageView({
               style={rectStyle(b.rect)}
               title="Redaction box (click to remove)"
               onClick={() => onRemoveBox(b.id)}
-            />
+            >
+              {markerById.has(b.id) && (
+                <span className="box-marker">{markerById.get(b.id)}</span>
+              )}
+            </div>
           ))}
           {drawing && (
             <div className="box drawing" style={rectStyle(drawing)} />
