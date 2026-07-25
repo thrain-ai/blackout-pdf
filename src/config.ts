@@ -19,7 +19,7 @@ export const PRO_PRICE_LABEL = "$25";
 // redirect to <site>/?checkout=success&session_id={CHECKOUT_SESSION_ID} so Pro
 // auto-activates. While null, Pro buttons show a waitlist mailto instead.
 export const CHECKOUT_URL: string | null =
-  "https://buy.stripe.com/fZucN53nTbrEbNWbEBcAo00";
+  "https://buy.stripe.com/5kQdR94rX53gf08bEBcAo03";
 
 // License worker (the "bouncer"): verifies checkout sessions against Stripe
 // server-side and mints signed tokens. While null, the app falls back to the
