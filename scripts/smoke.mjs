@@ -60,7 +60,8 @@ try {
   // 1. Landing renders
   await page.waitForSelector(".dropzone", { timeout: 10000 });
   const h1 = await page.$eval("h1", (el) => el.textContent);
-  if (!/never leave your/.test(h1)) fail("hero headline missing: " + h1);
+  if (!/Find every/.test(h1) || !/them for good/.test(h1))
+    fail("hero headline missing: " + h1);
   ok("landing renders: " + h1.trim());
 
   // 2. Upload the test PDF

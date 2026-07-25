@@ -179,22 +179,43 @@ export default function Landing({ onFile, loading, error, pro }: Props) {
       </header>
 
       <section className="hero">
+        {/* Detections are named in plain text (clearer, and what people
+            search for); the single bar falls on the verb, so the brand device
+            still demonstrates itself without hiding the pitch. */}
         <h1>
-          Your <Redacted>files</Redacted> never leave your{" "}
-          <Redacted>device.</Redacted>
+          Find every SSN, email and card number.{" "}
+          <Redacted>Erase</Redacted> them for good.
         </h1>
-        <p className="sub">Blackout PDF documents entirely in your browser.</p>
+        <p className="sub">Redact PDF documents entirely in your browser.</p>
 
         {dropzone}
         {error && <p className="error">{error}</p>}
+
+        <ul className="hero-features">
+          <li>
+            Automatic detection of Social Security numbers, emails, phone
+            numbers and card numbers — plus any name or term you search for
+          </li>
+          <li>
+            Blacked-out text is <strong>permanently removed</strong>, not
+            covered with a rectangle you can copy straight through
+          </li>
+          <li className="pro-feature">
+            FOIA and privilege exemption codes, numbered markers, and an
+            appended redaction log <span className="pro-tag">PRO</span>
+          </li>
+          <li>
+            Nothing is uploaded · no account · works offline once loaded
+          </li>
+        </ul>
 
         <p className="trust-row">
           <a href={REPO_URL} target="_blank" rel="noreferrer">
             open source
           </a>{" "}
-          · works offline once loaded
+          · free for documents up to {FREE_PAGE_LIMIT} pages
         </p>
-        <p className="hover-tip">↑ psst — hover the black bars</p>
+        <p className="hover-tip">↑ psst — hover the black bar</p>
       </section>
 
       <section className="steps-section">
