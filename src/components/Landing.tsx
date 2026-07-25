@@ -18,12 +18,19 @@ interface Props {
   pro?: boolean;
 }
 
-// A word hidden under a marker swipe; hovering (or focusing) peels the bar
-// back. The trailing punctuation belongs INSIDE the bar — a redactor would
-// never leave a period dangling.
+// A word hidden under a marker swipe; hovering peels the bar back. The
+// trailing punctuation belongs INSIDE the bar — a redactor would never leave a
+// period dangling.
+//
+// Deliberately not focusable. It used to carry tabIndex={0} and an aria-label,
+// which put a purely decorative flourish in the tab order — a dead stop for
+// keyboard users — and put aria-label on a span with no role, where the spec
+// prohibits it and most screen readers drop it anyway. The word itself is real
+// text in the heading, so assistive tech reads the headline correctly with no
+// help from us; the bar is a visual joke layered on top.
 function Redacted({ children }: { children: string }) {
   return (
-    <span className="redacted" tabIndex={0} aria-label={`redacted: ${children}`}>
+    <span className="redacted">
       <span className="word">{children}</span>
       <span className="swipe" aria-hidden="true" />
     </span>
@@ -178,129 +185,133 @@ export default function Landing({ onFile, loading, error, pro }: Props) {
         </nav>
       </header>
 
-      <section className="hero">
-        {/* Three beats on three lines: detection, redaction, permanence. The
-            bar lands on "Redact" so the hover reveal teaches Blackout =
-            redact; explicit lines because a wrap between the bar and "it."
-            reads as a typo. */}
-        <h1>
-          <span>Find it.</span>
-          <span>
-            <Redacted>Redact</Redacted> it.
-          </span>
-          <span>Gone.</span>
-        </h1>
-        <p className="sub">Redact PDF documents entirely in your browser.</p>
+      {/* A main landmark so screen-reader and keyboard users can skip straight
+          to the content, the way the Pro view already allows. */}
+      <main>
+        <section className="hero">
+          {/* Three beats on three lines: detection, redaction, permanence. The
+              bar lands on "Redact" so the hover reveal teaches Blackout =
+              redact; explicit lines because a wrap between the bar and "it."
+              reads as a typo. */}
+          <h1>
+            <span>Find it.</span>
+            <span>
+              <Redacted>Redact</Redacted> it.
+            </span>
+            <span>Gone.</span>
+          </h1>
+          <p className="sub">Redact PDF documents entirely in your browser.</p>
 
-        {dropzone}
-        {error && <p className="error">{error}</p>}
+          {dropzone}
+          {error && <p className="error">{error}</p>}
 
-        <ul className="hero-features">
-          <li>Finds SSNs, emails, phones and card numbers</li>
-          <li>
-            Text is <strong>deleted</strong>, not covered up
-          </li>
-          <li className="pro-feature">
-            FOIA &amp; privilege codes, plus a redaction log{" "}
-            <span className="pro-tag">PRO</span>
-          </li>
-          <li>No upload. No account. Works offline.</li>
-        </ul>
+          <ul className="hero-features">
+            <li>Finds SSNs, emails, phones and card numbers</li>
+            <li>
+              Text is <strong>deleted</strong>, not covered up
+            </li>
+            <li className="pro-feature">
+              FOIA &amp; privilege codes, plus a redaction log{" "}
+              <span className="pro-tag">PRO</span>
+            </li>
+            <li>No upload. No account. Works offline.</li>
+          </ul>
 
-        <p className="hover-tip">↑ psst — hover the black bar</p>
-      </section>
+          <p className="hover-tip">↑ psst — hover the black bar</p>
+        </section>
 
-      <section className="steps-section">
-        <h2 className="steps-title">How to use</h2>
-        <div className="steps">
-        <div>
-          <h3>1 · Open</h3>
-          <p>
-            Drop in any PDF. It opens right here in your browser and is never
-            sent anywhere.
-          </p>
-        </div>
-        <div>
-          <h3>2 · Review</h3>
-          <p>
-            Sensitive details are highlighted automatically. Click to confirm
-            each one, search for any name or word, or drag a box over anything
-            else.
-          </p>
-        </div>
-        <div>
-          <h3>3 · Download</h3>
-          <p>
-            Your redacted copy downloads instantly. The blacked-out
-            information is permanently removed — not just covered up.
-          </p>
-        </div>
-        </div>
-      </section>
-
-      <section className="why">
-        <h2>A black rectangle is not a redaction</h2>
-        <p>
-          Court filings, leaked contracts, botched public-records releases —
-          the classic mistake is a PDF where the "redacted" text is still
-          sitting under a drawn rectangle, and anyone can copy and paste right
-          through it. Blackout doesn't cover information up; it rebuilds each
-          page with the sensitive text permanently removed. What you download
-          is what everyone gets, and nothing more.
-        </p>
-        <p>
-          And you never have to upload a private document to a stranger's
-          website just to black things out. Blackout does all its work on your
-          own computer — the file never goes anywhere.
-        </p>
-      </section>
-
-      <section className="pricing" id="pricing">
-        <h2>Pricing</h2>
-        <div className="tiers">
-          <div className="tier">
-            <h3>Free</h3>
-            <p className="price">$0</p>
-            <ul>
-              <li>Documents up to {FREE_PAGE_LIMIT} pages</li>
-              <li>Auto-detection (SSN, email, phone, cards)</li>
-              <li>Custom term search + manual boxes</li>
-              <li>True flattened redaction</li>
-              <li>No signup, no watermark</li>
-            </ul>
-          </div>
-          <div className="tier pro">
-            <h3>Pro</h3>
-            <p className="price">
-              {PRO_PRICE_LABEL} <span className="once">one-time</span>
+        <section className="steps-section">
+          <h2 className="steps-title">How to use</h2>
+          <div className="steps">
+          <div>
+            <h3>1 · Open</h3>
+            <p>
+              Drop in any PDF. It opens right here in your browser and is never
+              sent anywhere.
             </p>
-            <ul>
-              <li>Unlimited pages</li>
-              <li>FOIA &amp; privilege exemption codes</li>
-              <li>Numbered markers + redaction log page</li>
-              <li>Everything in Free</li>
-              <li>Lifetime updates</li>
-              <li>Priority email support</li>
-            </ul>
-            {/* same-tab on purpose: the post-payment redirect must land back
-                in this tab to auto-activate Pro */}
-            <a className="btn" href={proHref}>
-              {CHECKOUT_URL ? "Get Pro" : "Join the Pro waitlist"}
-            </a>
           </div>
-        </div>
-      </section>
+          <div>
+            <h3>2 · Review</h3>
+            <p>
+              Sensitive details are highlighted automatically. Click to confirm
+              each one, search for any name or word, or drag a box over anything
+              else.
+            </p>
+          </div>
+          <div>
+            <h3>3 · Download</h3>
+            <p>
+              Your redacted copy downloads instantly. The blacked-out
+              information is permanently removed — not just covered up.
+            </p>
+          </div>
+          </div>
+        </section>
 
-      <section className="faq" id="faq">
-        <h2>FAQ</h2>
-        {FAQ.map(({ q, a, restoreForm }) => (
-          <details key={q}>
-            <summary>{q}</summary>
-            <p>{a}</p>
-            {restoreForm && WORKER_URL && <RestorePurchase />}
-          </details>
-        ))}
-      </section>
+        <section className="why">
+          <h2>A black rectangle is not a redaction</h2>
+          <p>
+            Court filings, leaked contracts, botched public-records releases —
+            the classic mistake is a PDF where the "redacted" text is still
+            sitting under a drawn rectangle, and anyone can copy and paste right
+            through it. Blackout doesn't cover information up; it rebuilds each
+            page with the sensitive text permanently removed. What you download
+            is what everyone gets, and nothing more.
+          </p>
+          <p>
+            And you never have to upload a private document to a stranger's
+            website just to black things out. Blackout does all its work on your
+            own computer — the file never goes anywhere.
+          </p>
+        </section>
+
+        <section className="pricing" id="pricing">
+          <h2>Pricing</h2>
+          <div className="tiers">
+            <div className="tier">
+              <h3>Free</h3>
+              <p className="price">$0</p>
+              <ul>
+                <li>Documents up to {FREE_PAGE_LIMIT} pages</li>
+                <li>Auto-detection (SSN, email, phone, cards)</li>
+                <li>Custom term search + manual boxes</li>
+                <li>True flattened redaction</li>
+                <li>No signup, no watermark</li>
+              </ul>
+            </div>
+            <div className="tier pro">
+              <h3>Pro</h3>
+              <p className="price">
+                {PRO_PRICE_LABEL} <span className="once">one-time</span>
+              </p>
+              <ul>
+                <li>Unlimited pages</li>
+                <li>FOIA &amp; privilege exemption codes</li>
+                <li>Numbered markers + redaction log page</li>
+                <li>Everything in Free</li>
+                <li>Lifetime updates</li>
+                <li>Priority email support</li>
+              </ul>
+              {/* same-tab on purpose: the post-payment redirect must land back
+                  in this tab to auto-activate Pro */}
+              <a className="btn" href={proHref}>
+                {CHECKOUT_URL ? "Get Pro" : "Join the Pro waitlist"}
+              </a>
+            </div>
+          </div>
+        </section>
+
+        <section className="faq" id="faq">
+          <h2>FAQ</h2>
+          {FAQ.map(({ q, a, restoreForm }) => (
+            <details key={q}>
+              <summary>{q}</summary>
+              <p>{a}</p>
+              {restoreForm && WORKER_URL && <RestorePurchase />}
+            </details>
+          ))}
+        </section>
+      </main>
 
       <footer>
         <p>

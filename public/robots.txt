@@ -1,0 +1,29 @@
+# Blackout PDF — blackout.thrain.ai
+#
+# AI crawlers are explicitly welcome. "What tool redacts a PDF properly?" is
+# increasingly asked inside an assistant rather than a search box, and there is
+# nothing here worth withholding: the source is public, there is no paywalled
+# content and no ad model.
+
+User-agent: *
+Allow: /
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+Sitemap: https://blackout.thrain.ai/sitemap.xml

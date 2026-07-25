@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Page not found — Blackout PDF</title>
+    <meta name="robots" content="noindex" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg transform='rotate(-4 50 50)'%3E%3Crect x='24' y='40' width='64' height='32' rx='8' fill='%23f5b400'/%3E%3Crect x='12' y='28' width='64' height='32' rx='8' fill='%23101010'/%3E%3C/g%3E%3C/svg%3E" />
+    <style>
+      :root { --paper:#f7f6f2; --ink:#101010; --ink-soft:#3c3c38; --amber:#f5b400; }
+      * { margin:0; padding:0; box-sizing:border-box; }
+      body {
+        background:var(--paper); color:var(--ink); min-height:100vh;
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        line-height:1.55; display:flex; align-items:center; justify-content:center; padding:24px;
+      }
+      main { max-width:44ch; }
+      .mark { position:relative; width:88px; height:64px; margin-bottom:32px; transform:rotate(-4deg); }
+      .mark i { position:absolute; display:block; border-radius:9px; height:35px; width:70px; }
+      .mark .b { background:var(--amber); left:19px; top:25px; }
+      .mark .f { background:var(--ink); left:0; top:5px; }
+      h1 {
+        font-family:"Arial Black","Helvetica Neue",sans-serif; font-weight:900;
+        font-size:clamp(1.9rem,6vw,2.8rem); line-height:1.06; letter-spacing:-0.025em;
+      }
+      p { margin-top:18px; color:var(--ink-soft); }
+      a.btn {
+        display:inline-block; margin-top:28px; background:var(--ink); color:var(--paper);
+        font-weight:700; padding:13px 24px; border-radius:6px; text-decoration:none;
+        box-shadow:4px 4px 0 var(--amber);
+      }
+      a.btn:hover { transform:translate(2px,2px); box-shadow:2px 2px 0 var(--amber); }
+      a.btn:focus-visible { outline:3px solid var(--ink); outline-offset:3px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="mark" aria-hidden="true"><i class="b"></i><i class="f"></i></div>
+      <h1>That page isn&rsquo;t here.</h1>
+      <p>
+        The link may be out of date, or the address slightly off. The redaction
+        tool itself is one click away.
+      </p>
+      <a class="btn" href="/">Redact a PDF</a>
+    </main>
+  </body>
+</html>

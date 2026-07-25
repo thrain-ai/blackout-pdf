@@ -3,18 +3,75 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Blackout — redact PDFs in your browser, no uploads</title>
+
+    <!-- Keyword-first. "Blackout" alone is a word we cannot own — three other
+         redaction products share it, plus power cuts and blackout curtains —
+         so the title leads with what people actually type and keeps the
+         qualified "Blackout PDF" as the brand. -->
+    <title>Redact a PDF in Your Browser — Nothing Uploaded | Blackout PDF</title>
     <meta
       name="description"
-      content="Find and permanently remove Social Security numbers, emails, phone numbers and card numbers from a PDF. Cite FOIA exemptions or privilege categories with an appended redaction log. Runs entirely in your browser — free, no signup, nothing uploaded."
+      content="Black out SSNs, emails, phone numbers and card numbers in a PDF and export a file where the text is genuinely gone — not hidden under a rectangle. Cite FOIA exemptions or privilege codes with an appended redaction log. Runs entirely in your browser. Free, no signup."
     />
-    <meta property="og:title" content="Blackout — redact PDFs without uploading them" />
+
+    <link rel="canonical" href="https://blackout.thrain.ai/" />
+
+    <meta property="og:title" content="A black rectangle is not a redaction" />
     <meta
       property="og:description"
-      content="True redaction, entirely in your browser. Auto-detect SSNs, emails and phone numbers, black them out, export a PDF where the text is really gone."
+      content="True PDF redaction, entirely in your browser. Auto-detect SSNs, emails and phone numbers, black them out, export a PDF where the text is really gone. Nothing is uploaded."
     />
     <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://blackout.thrain.ai/" />
+    <meta property="og:site_name" content="Blackout PDF" />
+    <meta property="og:image" content="https://blackout.thrain.ai/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Blackout PDF — a black rectangle is not a redaction" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <meta name="theme-color" content="#101010" />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg transform='rotate(-4 50 50)'%3E%3Crect x='24' y='40' width='64' height='32' rx='8' fill='%23f5b400'/%3E%3Crect x='12' y='28' width='64' height='32' rx='8' fill='%23101010'/%3E%3C/g%3E%3C/svg%3E" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Blackout PDF",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Any (web browser)",
+        "url": "https://blackout.thrain.ai/",
+        "description": "Browser-based PDF redaction that permanently removes the underlying text rather than covering it. Detects SSNs, emails, phone numbers and card numbers, supports FOIA exemption and privilege codes with an appended redaction log, and never uploads the file.",
+        "featureList": [
+          "True redaction — the text is removed, not covered",
+          "Automatic detection of SSNs, emails, phone numbers and card numbers",
+          "FOIA exemption and litigation privilege codes",
+          "Appended redaction log with numbered markers",
+          "Runs entirely in the browser — nothing is uploaded"
+        ],
+        "publisher": {
+          "@type": "Organization",
+          "name": "Thrain LLC",
+          "url": "https://thrain.ai/"
+        },
+        "offers": [
+          {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD",
+            "name": "Free — up to 10 pages per export"
+          },
+          {
+            "@type": "Offer",
+            "price": "25",
+            "priceCurrency": "USD",
+            "name": "Pro — unlimited pages, one-time lifetime licence"
+          }
+        ]
+      }
+    </script>
+    <!-- FAQPage JSON-LD is injected at build time by scripts/prerender.mjs,
+         read straight from the rendered FAQ so the two can never drift. -->
   </head>
   <body>
     <div id="root"></div>
