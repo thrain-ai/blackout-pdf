@@ -179,12 +179,16 @@ export default function Landing({ onFile, loading, error, pro }: Props) {
       </header>
 
       <section className="hero">
-        {/* Detections are named in plain text (clearer, and what people
-            search for); the single bar falls on the verb, so the brand device
-            still demonstrates itself without hiding the pitch. */}
+        {/* Three beats on three lines: detection, redaction, permanence. The
+            bar lands on "Redact" so the hover reveal teaches Blackout =
+            redact; explicit lines because a wrap between the bar and "it."
+            reads as a typo. */}
         <h1>
-          Find every SSN, email and card number.{" "}
-          <Redacted>Erase</Redacted> them for good.
+          <span>Find it.</span>
+          <span>
+            <Redacted>Redact</Redacted> it.
+          </span>
+          <span>Gone.</span>
         </h1>
         <p className="sub">Redact PDF documents entirely in your browser.</p>
 
@@ -192,29 +196,17 @@ export default function Landing({ onFile, loading, error, pro }: Props) {
         {error && <p className="error">{error}</p>}
 
         <ul className="hero-features">
+          <li>Finds SSNs, emails, phones and card numbers</li>
           <li>
-            Automatic detection of Social Security numbers, emails, phone
-            numbers and card numbers — plus any name or term you search for
-          </li>
-          <li>
-            Blacked-out text is <strong>permanently removed</strong>, not
-            covered with a rectangle you can copy straight through
+            Text is <strong>deleted</strong>, not covered up
           </li>
           <li className="pro-feature">
-            FOIA and privilege exemption codes, numbered markers, and an
-            appended redaction log <span className="pro-tag">PRO</span>
+            FOIA &amp; privilege codes, plus a redaction log{" "}
+            <span className="pro-tag">PRO</span>
           </li>
-          <li>
-            Nothing is uploaded · no account · works offline once loaded
-          </li>
+          <li>No upload. No account. Works offline.</li>
         </ul>
 
-        <p className="trust-row">
-          <a href={REPO_URL} target="_blank" rel="noreferrer">
-            open source
-          </a>{" "}
-          · free for documents up to {FREE_PAGE_LIMIT} pages
-        </p>
         <p className="hover-tip">↑ psst — hover the black bar</p>
       </section>
 
