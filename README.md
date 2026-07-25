@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="docs/logo.svg" alt="Blackout PDF" width="180" />
+  <img src="docs/logo.svg" alt="Blackout" width="180" />
 </p>
 
-<h1 align="center">Blackout PDF</h1>
+<h1 align="center">Blackout</h1>
 
 <p align="center">
   <strong>True PDF redaction, entirely in your browser.</strong><br />

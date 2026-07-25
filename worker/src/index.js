@@ -1,4 +1,4 @@
-// Blackout PDF license worker — the "bouncer".
+// Blackout license worker — the "bouncer".
 //
 // The static site can't hold secrets, so this Worker is the only party that
 // can (a) ask Stripe whether a checkout session is genuinely paid and (b) mint
@@ -59,14 +59,14 @@ function activationEmailHtml(env, link) {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eceae2;"><tr><td align="center" style="padding:36px 16px;">
 <table role="presentation" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background:#f7f6f2;border-radius:12px;font-family:Arial,Helvetica,sans-serif;color:#101010;">
 <tr><td style="padding:36px 40px;">
-  <img src="${logo}" width="78" alt="Blackout PDF" style="display:block;border:0;margin-bottom:26px;">
-  <div style="font-size:22px;font-weight:bold;margin-bottom:12px;">Activate Blackout PDF Pro</div>
+  <img src="${logo}" width="78" alt="Blackout" style="display:block;border:0;margin-bottom:26px;">
+  <div style="font-size:22px;font-weight:bold;margin-bottom:12px;">Activate Blackout Pro</div>
   <div style="font-size:15px;line-height:1.6;color:#3c3c38;margin-bottom:26px;">Click the button below to activate Pro on this device. The link works on any device you open it on &mdash; keep this email, it&#39;s your license.</div>
   <a href="${link}" style="display:inline-block;background:#f5b400;color:#101010;font-size:16px;font-weight:bold;text-decoration:none;padding:14px 30px;border-radius:8px;margin-bottom:28px;">Activate Pro</a>
   <div style="font-size:12px;line-height:1.6;color:#6c6c64;padding-bottom:24px;border-bottom:1px solid #d8d6cc;">Button not working? Paste this link into your browser:<br><a href="${link}" style="color:#6c6c64;word-break:break-all;">${link}</a></div>
   <div style="padding-top:22px;font-size:14px;font-weight:bold;">&mdash; Thrain Support</div>
-  <img src="${proLogo}" width="62" alt="Blackout PDF Pro" style="display:block;border:0;margin-top:12px;">
-  <div style="padding-top:16px;font-size:12px;color:#6c6c64;">Blackout PDF &middot; <a href="${env.SITE_URL}" style="color:#6c6c64;">blackout.thrain.ai</a> &middot; support@thrain.ai</div>
+  <img src="${proLogo}" width="62" alt="Blackout Pro" style="display:block;border:0;margin-top:12px;">
+  <div style="padding-top:16px;font-size:12px;color:#6c6c64;">Blackout &middot; <a href="${env.SITE_URL}" style="color:#6c6c64;">blackout.thrain.ai</a> &middot; support@thrain.ai</div>
 </td></tr>
 </table>
 </td></tr></table></body></html>`;
@@ -146,11 +146,11 @@ async function restore(env, body, ctx) {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            from: env.MAIL_FROM || "Blackout PDF <onboarding@resend.dev>",
+            from: env.MAIL_FROM || "Blackout <onboarding@resend.dev>",
             to: [email],
-            subject: "Your Blackout PDF Pro activation link",
+            subject: "Your Blackout Pro activation link",
             text:
-              `Click to activate Blackout PDF Pro on this device:\n\n${link}\n\n` +
+              `Click to activate Blackout Pro on this device:\n\n${link}\n\n` +
               `The link works on any device you open it on. Keep this email — ` +
               `it's your license.\n\n— Thrain Support\nblackout.thrain.ai\n`,
             html: activationEmailHtml(env, link),
