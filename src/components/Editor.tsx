@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { LoadedDoc } from "../App.tsx";
 import type { ManualBox, Rect, Suggestion, PageInfo } from "../pdf/types.ts";
+import type { PDFDocumentProxy } from "pdfjs-dist";
 import { findSuggestions } from "../pdf/textSearch.ts";
-import { exportRedacted, downloadBytes } from "../pdf/exporter.ts";
+import { exportRedacted, buildLogPreview, downloadBytes } from "../pdf/exporter.ts";
+import { loadPdf } from "../pdf/loader.ts";
 import { PATTERNS, CUSTOM_PATTERN_ID } from "../pdf/patterns.ts";
 import {
   CODE_SETS,
@@ -48,19 +50,23 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
   // as nothing).
   const acceptedState = useRef(new Map<string, string | null>());
 
-  // --- exemption codes (Pro) ----------------------------------------------
+  // --- exemption codes (Pro, opt-in) --------------------------------------
+  // Off by default: plain redaction stays the uncluttered default, and the
+  // whole codes interface only appears when an operator asks for it.
+  const [codesOn, setCodesOn] = useState(false);
   const [codeSetId, setCodeSetId] = useState(DEFAULT_CODE_SET_ID);
   const [pinnedCodeId, setPinnedCodeId] = useState<string | null>(null);
   const codeSet = useMemo(() => codeSetById(codeSetId), [codeSetId]);
+  const codesActive = pro && codesOn;
 
   // The code a redaction takes when it's applied: a pinned code wins,
   // otherwise the set's mapping for that detected category.
   const codeIdFor = useCallback(
     (categoryId?: string): string | null => {
-      if (!pro) return null;
+      if (!codesActive) return null;
       return resolveCode(codeSet, pinnedCodeId, categoryId)?.id ?? null;
     },
-    [pro, codeSet, pinnedCodeId],
+    [codesActive, codeSet, pinnedCodeId],
   );
 
   // --- mobile adaptations -------------------------------------------------
@@ -188,7 +194,7 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
         id: s.id,
         pageIndex: s.pageIndex,
         rect: s.rect,
-        code: pro ? codeById(s.codeId) : null,
+        code: codesActive ? codeById(s.codeId) : null,
       });
     }
     for (const b of manualBoxes) {
@@ -196,11 +202,11 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
         id: b.id,
         pageIndex: b.pageIndex,
         rect: b.rect,
-        code: pro ? codeById(b.codeId) : null,
+        code: codesActive ? codeById(b.codeId) : null,
       });
     }
     return orderAndNumber(inputs);
-  }, [suggestions, manualBoxes, pro]);
+  }, [suggestions, manualBoxes, codesActive]);
 
   const markerById = useMemo(() => {
     const m = new Map<string, number>();
@@ -209,6 +215,61 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
   }, [marks]);
 
   const codedCount = markerById.size;
+
+  // Live preview of the appended log, built with the same code the export uses
+  // so the operator sees exactly what they'll download. Debounced, since it
+  // rebuilds whenever redactions or codes change.
+  const [logDoc, setLogDoc] = useState<PDFDocumentProxy | null>(null);
+  const [logPages, setLogPages] = useState<PageInfo[]>([]);
+  const logInfo = useMemo(
+    () => ({
+      filename,
+      codeSetName: codeSet.name,
+      authority: codeSet.authority,
+      sourcePageCount: doc.numPages,
+    }),
+    [filename, codeSet, doc.numPages],
+  );
+  useEffect(() => {
+    if (!codesActive || codedCount === 0 || pages.length === 0) {
+      setLogDoc((prev) => {
+        prev?.destroy();
+        return null;
+      });
+      setLogPages([]);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const bytes = await buildLogPreview(marks, logInfo, {
+          width: pages[0].width,
+          height: pages[0].height,
+        });
+        const built = await loadPdf(bytes);
+        if (cancelled) {
+          built.destroy();
+          return;
+        }
+        const infos: PageInfo[] = [];
+        for (let i = 0; i < built.numPages; i++) {
+          const vp = (await built.getPage(i + 1)).getViewport({ scale: 1 });
+          infos.push({ index: i, width: vp.width, height: vp.height });
+        }
+        setLogDoc((prev) => {
+          prev?.destroy();
+          return built;
+        });
+        setLogPages(infos);
+      } catch (e) {
+        console.error("log preview failed", e);
+      }
+    }, 350);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [codesActive, codedCount, marks, logInfo, pages]);
 
   const addTerm = () => {
     const t = termInput.trim();
@@ -285,56 +346,28 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
           {scanning ? " · scanning…" : ""}
         </p>
 
-        <div className={`codes-panel${pro ? "" : " locked"}`}>
-          <div className="cat-head">
-            <span>Exemption codes</span>
-            {!pro && <span className="pro-tag">PRO</span>}
-          </div>
-          {pro ? (
-            <>
-              <select
-                aria-label="Code set"
-                value={codeSetId}
-                onChange={(e) => {
-                  setCodeSetId(e.target.value);
-                  setPinnedCodeId(null);
-                }}
-              >
-                {CODE_SETS.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-              <select
-                aria-label="Code to apply"
-                value={pinnedCodeId ?? ""}
-                onChange={(e) => setPinnedCodeId(e.target.value || null)}
-              >
-                <option value="">Auto by type</option>
-                {codeSet.codes.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.label} — {c.basis}
-                  </option>
-                ))}
-              </select>
+        <div className={`codes-panel${codesActive ? " on" : ""}`}>
+          <div className="codes-head">
+            <span className="codes-title">Redaction reasons</span>
+            {pro ? (
               <button
-                className="mini-btn"
-                disabled={acceptedCount === 0}
-                onClick={applyCodeToAll}
+                className={`switch${codesOn ? " on" : ""}`}
+                role="switch"
+                aria-checked={codesOn}
+                aria-label="Redaction reasons"
+                onClick={() => setCodesOn((v) => !v)}
               >
-                Apply to all
+                <span className="knob" />
               </button>
-              <p className="meta">
-                {codedCount > 0
-                  ? `${codedCount} coded — numbered markers and a log page are appended on export.`
-                  : "Redactions you apply get a code, a numbered marker, and a log entry."}
-              </p>
-            </>
-          ) : (
+            ) : (
+              <span className="pro-tag">PRO</span>
+            )}
+          </div>
+
+          {!pro && (
             <>
               <p className="meta">
-                Cite FOIA exemptions or privilege categories on every redaction,
+                Cite a FOIA exemption or privilege category on every redaction,
                 with numbered markers and an appended log page.
               </p>
               <button className="link-btn" onClick={() => setShowUpgrade(true)}>
@@ -342,9 +375,57 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
               </button>
             </>
           )}
+
+          {codesActive && (
+            <>
+              <div className="seg" role="group" aria-label="Code set">
+                {CODE_SETS.map((s) => (
+                  <button
+                    key={s.id}
+                    className={`seg-btn${codeSetId === s.id ? " on" : ""}`}
+                    aria-pressed={codeSetId === s.id}
+                    onClick={() => {
+                      setCodeSetId(s.id);
+                      setPinnedCodeId(null);
+                    }}
+                  >
+                    {s.shortName}
+                  </button>
+                ))}
+              </div>
+
+              <label className="field">
+                <span className="field-label">New redactions use</span>
+                <select
+                  aria-label="Code to apply"
+                  value={pinnedCodeId ?? ""}
+                  onChange={(e) => setPinnedCodeId(e.target.value || null)}
+                >
+                  <option value="">Auto by type</option>
+                  {codeSet.codes.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.label} · {c.short}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              {acceptedCount > 0 && (
+                <button className="mini-btn" onClick={applyCodeToAll}>
+                  Apply to all existing
+                </button>
+              )}
+
+              <p className="meta">
+                {codedCount > 0
+                  ? `${codedCount} coded · log page previewed below`
+                  : "Redact something to start the log."}
+              </p>
+            </>
+          )}
         </div>
 
-        <div className="categories">
+        <div className={`categories${codesActive ? " coded" : ""}`}>
           {[...PATTERNS.map((p) => p.id), CUSTOM_PATTERN_ID].map((cat) => {
             const items = byCategory.get(cat) ?? [];
             if (cat === CUSTOM_PATTERN_ID && customTerms.length === 0) return null;
@@ -402,29 +483,40 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
                                     )
                                   }
                                 />
-                                <span className="match-text">
-                                  {group[0].text}
+                                <span className="match-main">
+                                  <span
+                                    className="match-text"
+                                    title={group[0].text}
+                                  >
+                                    {group[0].text}
+                                  </span>
+                                  {group.length > 1 && (
+                                    <span className="match-count">
+                                      ×{group.length}
+                                    </span>
+                                  )}
                                 </span>
-                                {(() => {
-                                  if (!pro || !allOn) return null;
-                                  const ids = new Set(
-                                    group.map((s) => s.codeId ?? ""),
-                                  );
-                                  if (ids.size !== 1) return null;
-                                  const c = codeById([...ids][0]);
-                                  return c ? (
-                                    <span className="code-badge">{c.label}</span>
-                                  ) : null;
-                                })()}
-                                {group.length > 1 && (
-                                  <span className="match-count">
-                                    ×{group.length}
+                                {codesActive && (
+                                  <span className="code-cell">
+                                    {(() => {
+                                      if (!allOn) return null;
+                                      const ids = new Set(
+                                        group.map((s) => s.codeId ?? ""),
+                                      );
+                                      if (ids.size !== 1) return null;
+                                      const c = codeById([...ids][0]);
+                                      return c ? (
+                                        <span className="code-badge">
+                                          {c.label}
+                                        </span>
+                                      ) : null;
+                                    })()}
                                   </span>
                                 )}
                                 <span className="match-page">
                                   {pages.length === 1
-                                    ? `p${pages[0] + 1}`
-                                    : `${pages.length} pgs`}
+                                    ? `Page ${pages[0] + 1}`
+                                    : `${pages.length} pages`}
                                 </span>
                               </label>
                             </li>
@@ -574,6 +666,30 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
             markerById={markerById}
           />
         ))}
+
+        {/* Live preview of the log that will be appended on export. */}
+        {logDoc &&
+          logPages.map((p) => (
+            <PageView
+              key={`log-${p.index}`}
+              doc={logDoc}
+              page={p}
+              suggestions={[]}
+              manualBoxes={[]}
+              onToggleSuggestion={() => {}}
+              onAddBox={() => {}}
+              onRemoveBox={() => {}}
+              maxWidth={pageMaxWidth}
+              drawEnabled={false}
+              markerById={markerById}
+              readOnly
+              label={
+                logPages.length > 1
+                  ? `Redaction log ${p.index + 1} of ${logPages.length} · appended on export`
+                  : "Redaction log · appended on export"
+              }
+            />
+          ))}
       </main>
 
       {showUpgrade && (

@@ -11,15 +11,19 @@
 
 export interface RedactionCode {
   id: string;
-  /** Shown in the log's CODE column and used as the code's short name. */
+  /** Shown in the log's CODE column and on sidebar badges. */
   label: string;
-  /** The stated basis for withholding, printed beside the code. */
+  /** Compact wording for menus, where the full basis would truncate. */
+  short: string;
+  /** The stated basis for withholding, printed in the log. */
   basis: string;
 }
 
 export interface CodeSet {
   id: string;
   name: string;
+  /** Tab-sized name for the set switcher. */
+  shortName: string;
   /** Printed under the log heading to identify the authority in use. */
   authority: string;
   codes: RedactionCode[];
@@ -30,53 +34,45 @@ export interface CodeSet {
 const FOIA: CodeSet = {
   id: "foia",
   name: "FOIA exemptions",
+  shortName: "FOIA",
   authority: "Freedom of Information Act, 5 U.S.C. § 552(b)",
   codes: [
-    { id: "b1", label: "(b)(1)", basis: "Classified national defense or foreign policy information" },
-    { id: "b2", label: "(b)(2)", basis: "Internal personnel rules and practices" },
-    { id: "b3", label: "(b)(3)", basis: "Information specifically exempted by other statute" },
-    { id: "b4", label: "(b)(4)", basis: "Trade secrets; confidential commercial or financial information" },
-    { id: "b5", label: "(b)(5)", basis: "Privileged inter-agency or intra-agency communications" },
-    { id: "b6", label: "(b)(6)", basis: "Clearly unwarranted invasion of personal privacy" },
-    { id: "b7a", label: "(b)(7)(A)", basis: "Law enforcement: interference with enforcement proceedings" },
-    { id: "b7b", label: "(b)(7)(B)", basis: "Law enforcement: would deprive a person of a fair trial" },
-    { id: "b7c", label: "(b)(7)(C)", basis: "Law enforcement: unwarranted invasion of personal privacy" },
-    { id: "b7d", label: "(b)(7)(D)", basis: "Law enforcement: identity of a confidential source" },
-    { id: "b7e", label: "(b)(7)(E)", basis: "Law enforcement: techniques, procedures and guidelines" },
-    { id: "b7f", label: "(b)(7)(F)", basis: "Law enforcement: would endanger life or physical safety" },
-    { id: "b8", label: "(b)(8)", basis: "Supervision of financial institutions" },
-    { id: "b9", label: "(b)(9)", basis: "Geological and geophysical information concerning wells" },
+    { id: "b1", label: "(b)(1)", short: "National security", basis: "Classified national defense or foreign policy information" },
+    { id: "b2", label: "(b)(2)", short: "Internal personnel rules", basis: "Internal personnel rules and practices" },
+    { id: "b3", label: "(b)(3)", short: "Exempt by other statute", basis: "Information specifically exempted by other statute" },
+    { id: "b4", label: "(b)(4)", short: "Trade secrets", basis: "Trade secrets; confidential commercial or financial information" },
+    { id: "b5", label: "(b)(5)", short: "Privileged communications", basis: "Privileged inter-agency or intra-agency communications" },
+    { id: "b6", label: "(b)(6)", short: "Personal privacy", basis: "Clearly unwarranted invasion of personal privacy" },
+    { id: "b7a", label: "(b)(7)(A)", short: "Enforcement proceedings", basis: "Law enforcement: interference with enforcement proceedings" },
+    { id: "b7b", label: "(b)(7)(B)", short: "Fair trial", basis: "Law enforcement: would deprive a person of a fair trial" },
+    { id: "b7c", label: "(b)(7)(C)", short: "Privacy (law enforcement)", basis: "Law enforcement: unwarranted invasion of personal privacy" },
+    { id: "b7d", label: "(b)(7)(D)", short: "Confidential source", basis: "Law enforcement: identity of a confidential source" },
+    { id: "b7e", label: "(b)(7)(E)", short: "Techniques and procedures", basis: "Law enforcement: techniques, procedures and guidelines" },
+    { id: "b7f", label: "(b)(7)(F)", short: "Safety of individuals", basis: "Law enforcement: would endanger life or physical safety" },
+    { id: "b8", label: "(b)(8)", short: "Financial institutions", basis: "Supervision of financial institutions" },
+    { id: "b9", label: "(b)(9)", short: "Wells", basis: "Geological and geophysical information concerning wells" },
   ],
-  autoMap: {
-    ssn: "b6",
-    card: "b6",
-    email: "b6",
-    phone: "b6",
-  },
+  autoMap: { ssn: "b6", card: "b6", email: "b6", phone: "b6" },
 };
 
 const LITIGATION: CodeSet = {
   id: "litigation",
   name: "Litigation / privilege",
+  shortName: "Litigation",
   authority: "Privilege and personal-identifier categories (cf. Fed. R. Civ. P. 5.2)",
   codes: [
-    { id: "ac", label: "A-C PRIV", basis: "Attorney-client privileged communication" },
-    { id: "wp", label: "WORK PROD", basis: "Attorney work product" },
-    { id: "conf", label: "CONFID", basis: "Confidential under protective order" },
-    { id: "pii", label: "PII", basis: "Personally identifiable information" },
-    { id: "ssn", label: "SSN/TIN", basis: "Social Security or taxpayer identification number" },
-    { id: "fin", label: "FIN ACCT", basis: "Financial account number" },
-    { id: "dob", label: "DOB", basis: "Date of birth" },
-    { id: "minor", label: "MINOR", basis: "Name of an individual known to be a minor" },
-    { id: "phi", label: "PHI", basis: "Protected health information" },
-    { id: "ts", label: "TRADE SEC", basis: "Trade secret or proprietary commercial information" },
+    { id: "ac", label: "A-C PRIV", short: "Attorney-client", basis: "Attorney-client privileged communication" },
+    { id: "wp", label: "WORK PROD", short: "Work product", basis: "Attorney work product" },
+    { id: "conf", label: "CONFID", short: "Protective order", basis: "Confidential under protective order" },
+    { id: "pii", label: "PII", short: "Personal information", basis: "Personally identifiable information" },
+    { id: "ssn", label: "SSN/TIN", short: "SSN / taxpayer ID", basis: "Social Security or taxpayer identification number" },
+    { id: "fin", label: "FIN ACCT", short: "Financial account", basis: "Financial account number" },
+    { id: "dob", label: "DOB", short: "Date of birth", basis: "Date of birth" },
+    { id: "minor", label: "MINOR", short: "Minor's name", basis: "Name of an individual known to be a minor" },
+    { id: "phi", label: "PHI", short: "Health information", basis: "Protected health information" },
+    { id: "ts", label: "TRADE SEC", short: "Trade secret", basis: "Trade secret or proprietary commercial information" },
   ],
-  autoMap: {
-    ssn: "ssn",
-    card: "fin",
-    email: "pii",
-    phone: "pii",
-  },
+  autoMap: { ssn: "ssn", card: "fin", email: "pii", phone: "pii" },
 };
 
 // Code ids are qualified with their set ("foia:b6") so a redaction keeps its

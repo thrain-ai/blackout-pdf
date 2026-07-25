@@ -18,6 +18,10 @@ interface Props {
   // Marker numbers for coded redactions, keyed by suggestion/box id — the
   // same figures the export burns onto the bars.
   markerById: Map<string, number>;
+  // Log-page preview: rendered, but not a redaction surface.
+  readOnly?: boolean;
+  // Overrides the "Page N" caption (the log preview names itself).
+  label?: string;
 }
 
 export default function PageView({
@@ -31,6 +35,8 @@ export default function PageView({
   maxWidth,
   drawEnabled,
   markerById,
+  readOnly = false,
+  label,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -110,9 +116,20 @@ export default function PageView({
     height: r.h * displayScale,
   });
 
+  if (readOnly) {
+    return (
+      <div className="page-wrap" style={{ width: cssW }}>
+        <div className="page-label log">{label ?? `Page ${page.index + 1}`}</div>
+        <div className="page" style={{ width: cssW, height: cssH }}>
+          <canvas ref={canvasRef} style={{ width: cssW, height: cssH }} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="page-wrap" style={{ width: cssW }}>
-      <div className="page-label">Page {page.index + 1}</div>
+      <div className="page-label">{label ?? `Page ${page.index + 1}`}</div>
       <div className="page" style={{ width: cssW, height: cssH }}>
         <canvas ref={canvasRef} style={{ width: cssW, height: cssH }} />
         <div

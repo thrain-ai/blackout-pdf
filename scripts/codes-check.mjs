@@ -72,14 +72,15 @@ try {
     { timeout: 30000 },
   );
 
-  // Codes panel must be unlocked for Pro.
-  if (await page.$(".codes-panel.locked")) fail("codes panel locked for a Pro user");
-  const setOptions = await page.$$eval(
-    '.codes-panel select[aria-label="Code set"] option',
-    (els) => els.map((e) => e.textContent.trim()),
+  // Codes are opt-in: the controls must be hidden until the switch is on.
+  if (await page.$(".seg")) fail("code controls visible before opting in");
+  await page.click(".codes-panel .switch");
+  await page.waitForSelector(".seg", { timeout: 5000 });
+  const sets = await page.$$eval(".seg-btn", (els) =>
+    els.map((e) => e.textContent.trim()),
   );
-  if (setOptions.length < 2) fail("expected both FOIA and litigation code sets");
-  ok(`code sets available: ${setOptions.join(" / ")}`);
+  if (sets.length < 2) fail("expected both FOIA and litigation code sets");
+  ok(`codes toggled on; sets available: ${sets.join(" / ")}`);
 
   // Redact everything; with no pinned code the FOIA auto-map applies (b)(6).
   for (const b of await page.$$(".category .mini-btn")) {
@@ -139,8 +140,18 @@ try {
 
   await page.screenshot({ path: join(OUT, "codes-editor.png") });
 
+  // The log must be previewed in the editor, not only in the download.
+  await page.waitForSelector(".page-label.log", { timeout: 10000 });
+  const logLabel = await page.$eval(".page-label.log", (el) => el.textContent);
+  if (!/Redaction log/.test(logLabel)) fail("log preview label wrong: " + logLabel);
+  ok(`log page previewed in the editor ("${logLabel.trim()}")`);
+
   // Second set: switching to litigation and re-applying recodes everything.
-  await page.select('.codes-panel select[aria-label="Code set"]', "litigation");
+  await page.evaluate(() => {
+    [...document.querySelectorAll(".seg-btn")]
+      .find((b) => /Litigation/.test(b.textContent))
+      .click();
+  });
   await new Promise((r) => setTimeout(r, 200));
   await page.evaluate(() => {
     const btn = [...document.querySelectorAll(".codes-panel .mini-btn")].find((b) =>

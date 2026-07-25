@@ -15,6 +15,8 @@ const standardFontDataUrl = new URL(
   window.location.href,
 ).href;
 
-export async function loadPdf(data: ArrayBuffer): Promise<PDFDocumentProxy> {
+export async function loadPdf(
+  data: ArrayBuffer | Uint8Array,
+): Promise<PDFDocumentProxy> {
   return pdfjs.getDocument({ data, standardFontDataUrl }).promise;
 }

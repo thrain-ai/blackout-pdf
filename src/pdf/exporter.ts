@@ -387,6 +387,26 @@ export async function exportRedacted(
   return out.save();
 }
 
+/**
+ * Builds a PDF containing only the log pages, for live preview in the editor.
+ * Deliberately reuses the export's drawing code, so what the operator previews
+ * cannot drift from what they download.
+ */
+export async function buildLogPreview(
+  marks: RedactionMark[],
+  info: LogInfo,
+  size: { width: number; height: number },
+): Promise<Uint8Array> {
+  const out = await PDFDocument.create();
+  const fonts = {
+    regular: await out.embedFont(StandardFonts.Helvetica),
+    bold: await out.embedFont(StandardFonts.HelveticaBold),
+  };
+  appendLog(out, marks, info, size, fonts);
+  if (out.getPageCount() === 0) out.addPage([size.width, size.height]);
+  return out.save();
+}
+
 export function downloadBytes(bytes: Uint8Array, filename: string) {
   const blob = new Blob([bytes as BlobPart], { type: "application/pdf" });
   const url = URL.createObjectURL(blob);
