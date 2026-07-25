@@ -35,7 +35,7 @@ export default function UpgradeModal({ pageCount, onClose }: Props) {
         ) : (
           <a
             className="btn"
-            href={`mailto:${CONTACT_EMAIL}?subject=Blackout%20PDF%20Pro%20waitlist`}
+            href={`mailto:${CONTACT_EMAIL}?subject=Blackout%20Pro%20waitlist`}
           >
             Join the waitlist
           </a>

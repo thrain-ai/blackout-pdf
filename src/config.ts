@@ -3,7 +3,7 @@
 // flipping revenue on is a one-line change per field. See docs/MONETIZATION.md.
 // ---------------------------------------------------------------------------
 
-export const PRODUCT_NAME = "Blackout PDF";
+export const PRODUCT_NAME = "Blackout";
 
 export const COMPANY = "Thrain LLC";
 

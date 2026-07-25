@@ -84,7 +84,7 @@ export default function Landing({ onFile, loading, error, pro }: Props) {
 
   const proHref =
     CHECKOUT_URL ??
-    `mailto:${CONTACT_EMAIL}?subject=Blackout%20PDF%20Pro%20waitlist`;
+    `mailto:${CONTACT_EMAIL}?subject=Blackout%20Pro%20waitlist`;
 
   const dropzone = (
     <div

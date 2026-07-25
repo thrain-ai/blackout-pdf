@@ -9,7 +9,7 @@ setup step or a marketing action.
 Checkout runs on a **Stripe payment link** (Managed Payments handles tax as
 merchant of record) wired into `src/config.ts`:
 
-- Product: **Blackout PDF Pro**, $25 one-time.
+- Product: **Blackout Pro**, $25 one-time.
 - The payment link's after-payment setting redirects to
   `<site>/?checkout=success&session_id={CHECKOUT_SESSION_ID}`, which
   auto-activates Pro on the buyer's device (`src/license.ts`) — no backend.
