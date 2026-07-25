@@ -13,12 +13,15 @@ export interface Suggestion {
   categoryId: string;
   text: string;
   accepted: boolean;
+  /** Exemption code id assigned when redacted (Pro); null = uncoded. */
+  codeId?: string | null;
 }
 
 export interface ManualBox {
   id: string;
   pageIndex: number;
   rect: Rect;
+  codeId?: string | null;
 }
 
 export interface PageInfo {

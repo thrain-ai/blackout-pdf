@@ -1,9 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { LoadedDoc } from "../App.tsx";
 import type { ManualBox, Rect, Suggestion, PageInfo } from "../pdf/types.ts";
+import type { PDFDocumentProxy } from "pdfjs-dist";
 import { findSuggestions } from "../pdf/textSearch.ts";
-import { exportRedacted, downloadBytes } from "../pdf/exporter.ts";
+import { exportRedacted, buildLogPreview, downloadBytes } from "../pdf/exporter.ts";
+import { loadPdf } from "../pdf/loader.ts";
 import { PATTERNS, CUSTOM_PATTERN_ID } from "../pdf/patterns.ts";
+import {
+  CODE_SETS,
+  DEFAULT_CODE_SET_ID,
+  codeById,
+  codeSetById,
+  resolveCode,
+} from "../pdf/codes.ts";
+import { orderAndNumber, type MarkInput } from "../pdf/marks.ts";
 import { FREE_PAGE_LIMIT } from "../config.ts";
 import PageView from "./PageView.tsx";
 import UpgradeModal from "./UpgradeModal.tsx";
@@ -35,7 +45,29 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
   const [scanning, setScanning] = useState(true);
   const [exporting, setExporting] = useState<null | { done: number; total: number }>(null);
   const [showUpgrade, setShowUpgrade] = useState(false);
-  const acceptedKeys = useRef(new Set<string>());
+  // Accepted suggestions survive a re-scan (adding a custom term rescans the
+  // document), and so must their assigned codes: key -> codeId (null = coded
+  // as nothing).
+  const acceptedState = useRef(new Map<string, string | null>());
+
+  // --- exemption codes (Pro, opt-in) --------------------------------------
+  // Off by default: plain redaction stays the uncluttered default, and the
+  // whole codes interface only appears when an operator asks for it.
+  const [codesOn, setCodesOn] = useState(false);
+  const [codeSetId, setCodeSetId] = useState(DEFAULT_CODE_SET_ID);
+  const [pinnedCodeId, setPinnedCodeId] = useState<string | null>(null);
+  const codeSet = useMemo(() => codeSetById(codeSetId), [codeSetId]);
+  const codesActive = pro && codesOn;
+
+  // The code a redaction takes when it's applied: a pinned code wins,
+  // otherwise the set's mapping for that detected category.
+  const codeIdFor = useCallback(
+    (categoryId?: string): string | null => {
+      if (!codesActive) return null;
+      return resolveCode(codeSet, pinnedCodeId, categoryId)?.id ?? null;
+    },
+    [codesActive, codeSet, pinnedCodeId],
+  );
 
   // --- mobile adaptations -------------------------------------------------
   // Coarse pointer = touch device: drags scroll by default, drawing is an
@@ -77,7 +109,11 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
         found.push(...s);
       }
       for (const s of found) {
-        if (acceptedKeys.current.has(suggestionKey(s))) s.accepted = true;
+        const key = suggestionKey(s);
+        if (acceptedState.current.has(key)) {
+          s.accepted = true;
+          s.codeId = acceptedState.current.get(key) ?? null;
+        }
       }
       setPages(infos);
       setSuggestions(found);
@@ -88,22 +124,62 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
     };
   }, [doc, customTerms]);
 
-  const setAccepted = useCallback((ids: string[], accepted: boolean) => {
+  const setAccepted = useCallback(
+    (ids: string[], accepted: boolean) => {
+      setSuggestions((prev) =>
+        prev.map((s) => {
+          if (!ids.includes(s.id)) return s;
+          const key = suggestionKey(s);
+          if (!accepted) {
+            acceptedState.current.delete(key);
+            return { ...s, accepted: false, codeId: null };
+          }
+          const codeId = codeIdFor(s.categoryId);
+          acceptedState.current.set(key, codeId);
+          return { ...s, accepted: true, codeId };
+        }),
+      );
+    },
+    [codeIdFor],
+  );
+
+  const addManualBox = useCallback(
+    (pageIndex: number, rect: Rect) => {
+      setManualBoxes((prev) => [
+        ...prev,
+        { id: `m${boxId++}`, pageIndex, rect, codeId: codeIdFor() },
+      ]);
+    },
+    [codeIdFor],
+  );
+
+  /**
+   * Override the code on one sidebar row. Rows group every instance of the
+   * same text, so this sets all of them — which is nearly always the intent,
+   * and a single-instance exception can still be handled on the page itself.
+   */
+  const setCodeForGroup = useCallback((ids: string[], codeId: string | null) => {
     setSuggestions((prev) =>
       prev.map((s) => {
         if (!ids.includes(s.id)) return s;
-        const next = { ...s, accepted };
-        const key = suggestionKey(s);
-        if (accepted) acceptedKeys.current.add(key);
-        else acceptedKeys.current.delete(key);
-        return next;
+        acceptedState.current.set(suggestionKey(s), codeId);
+        return { ...s, codeId };
       }),
     );
   }, []);
 
-  const addManualBox = useCallback((pageIndex: number, rect: Rect) => {
-    setManualBoxes((prev) => [...prev, { id: `m${boxId++}`, pageIndex, rect }]);
-  }, []);
+  /** Retro-apply the current code selection to everything already redacted. */
+  const applyCodeToAll = useCallback(() => {
+    setSuggestions((prev) =>
+      prev.map((s) => {
+        if (!s.accepted) return s;
+        const codeId = codeIdFor(s.categoryId);
+        acceptedState.current.set(suggestionKey(s), codeId);
+        return { ...s, codeId };
+      }),
+    );
+    setManualBoxes((prev) => prev.map((b) => ({ ...b, codeId: codeIdFor() })));
+  }, [codeIdFor]);
 
   const removeManualBox = useCallback((id: string) => {
     setManualBoxes((prev) => prev.filter((b) => b.id !== id));
@@ -122,6 +198,108 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
   const acceptedCount =
     suggestions.filter((s) => s.accepted).length + manualBoxes.length;
 
+  // Single source of truth for redactions in reading order, with marker
+  // numbers — the overlay and the exported log both read from this, so the
+  // figure on a bar always matches the figure in the log.
+  const marks = useMemo(() => {
+    const inputs: MarkInput[] = [];
+    for (const s of suggestions) {
+      if (!s.accepted) continue;
+      inputs.push({
+        id: s.id,
+        pageIndex: s.pageIndex,
+        rect: s.rect,
+        code: codesActive ? codeById(s.codeId) : null,
+      });
+    }
+    for (const b of manualBoxes) {
+      inputs.push({
+        id: b.id,
+        pageIndex: b.pageIndex,
+        rect: b.rect,
+        code: codesActive ? codeById(b.codeId) : null,
+      });
+    }
+    return orderAndNumber(inputs);
+  }, [suggestions, manualBoxes, codesActive]);
+
+  const markerById = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const mark of marks) if (mark.marker !== null) m.set(mark.id, mark.marker);
+    return m;
+  }, [marks]);
+
+  const codedCount = markerById.size;
+
+  // Live preview of the appended log, built with the same code the export uses
+  // so the operator sees exactly what they'll download. Debounced, since it
+  // rebuilds whenever redactions or codes change.
+  const [logDoc, setLogDoc] = useState<PDFDocumentProxy | null>(null);
+  const [logPages, setLogPages] = useState<PageInfo[]>([]);
+  const logInfo = useMemo(
+    () => ({
+      filename,
+      codeSetName: codeSet.name,
+      authority: codeSet.authority,
+      sourcePageCount: doc.numPages,
+    }),
+    [filename, codeSet, doc.numPages],
+  );
+  // Rebuild only when the log's content actually changes. `marks` is a fresh
+  // array on every interaction, so without this the log would be regenerated
+  // for edits it doesn't depend on (moving or adding an uncoded box).
+  const logSignature = useMemo(
+    () =>
+      marks
+        .filter((m) => m.marker !== null)
+        .map((m) => `${m.marker}:${m.pageIndex}:${m.code?.id ?? ""}`)
+        .join("|"),
+    [marks],
+  );
+  const marksRef = useRef(marks);
+  marksRef.current = marks;
+
+  useEffect(() => {
+    if (!codesActive || !logSignature || pages.length === 0) {
+      setLogDoc((prev) => {
+        prev?.destroy();
+        return null;
+      });
+      setLogPages([]);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const bytes = await buildLogPreview(marksRef.current, logInfo, {
+          width: pages[0].width,
+          height: pages[0].height,
+        });
+        const built = await loadPdf(bytes);
+        if (cancelled) {
+          built.destroy();
+          return;
+        }
+        const infos: PageInfo[] = [];
+        for (let i = 0; i < built.numPages; i++) {
+          const vp = (await built.getPage(i + 1)).getViewport({ scale: 1 });
+          infos.push({ index: i, width: vp.width, height: vp.height });
+        }
+        setLogDoc((prev) => {
+          prev?.destroy();
+          return built;
+        });
+        setLogPages(infos);
+      } catch (e) {
+        console.error("log preview failed", e);
+      }
+    }, 350);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [codesActive, logSignature, logInfo, pages]);
+
   const addTerm = () => {
     const t = termInput.trim();
     if (t.length >= 2 && !customTerms.includes(t)) {
@@ -137,17 +315,18 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
     }
     setExporting({ done: 0, total: doc.numPages });
     try {
-      const byPage = new Map<number, Rect[]>();
-      for (const s of suggestions) {
-        if (!s.accepted) continue;
-        byPage.set(s.pageIndex, [...(byPage.get(s.pageIndex) ?? []), s.rect]);
-      }
-      for (const b of manualBoxes) {
-        byPage.set(b.pageIndex, [...(byPage.get(b.pageIndex) ?? []), b.rect]);
-      }
-      const bytes = await exportRedacted(doc, byPage, (done, total) =>
-        setExporting({ done, total }),
-      );
+      const bytes = await exportRedacted(doc, marks, {
+        onProgress: (done, total) => setExporting({ done, total }),
+        log:
+          codedCount > 0
+            ? {
+                filename,
+                codeSetName: codeSet.name,
+                authority: codeSet.authority,
+                sourcePageCount: doc.numPages,
+              }
+            : null,
+      });
       downloadBytes(bytes, filename.replace(/\.pdf$/i, "") + "-redacted.pdf");
     } catch (e) {
       console.error(e);
@@ -196,7 +375,86 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
           {scanning ? " · scanning…" : ""}
         </p>
 
-        <div className="categories">
+        <div className={`codes-panel${codesActive ? " on" : ""}`}>
+          <div className="codes-head">
+            <span className="codes-title">Redaction reasons</span>
+            {pro ? (
+              <button
+                className={`switch${codesOn ? " on" : ""}`}
+                role="switch"
+                aria-checked={codesOn}
+                aria-label="Redaction reasons"
+                onClick={() => setCodesOn((v) => !v)}
+              >
+                <span className="knob" />
+              </button>
+            ) : (
+              <span className="pro-tag">PRO</span>
+            )}
+          </div>
+
+          {!pro && (
+            <>
+              <p className="meta">
+                Cite a FOIA exemption or privilege category on every redaction,
+                with numbered markers and an appended log page.
+              </p>
+              <button className="link-btn" onClick={() => setShowUpgrade(true)}>
+                Unlock with Pro
+              </button>
+            </>
+          )}
+
+          {codesActive && (
+            <>
+              <div className="seg" role="group" aria-label="Code set">
+                {CODE_SETS.map((s) => (
+                  <button
+                    key={s.id}
+                    className={`seg-btn${codeSetId === s.id ? " on" : ""}`}
+                    aria-pressed={codeSetId === s.id}
+                    onClick={() => {
+                      setCodeSetId(s.id);
+                      setPinnedCodeId(null);
+                    }}
+                  >
+                    {s.shortName}
+                  </button>
+                ))}
+              </div>
+
+              <label className="field">
+                <span className="field-label">New redactions use</span>
+                <select
+                  aria-label="Code to apply"
+                  value={pinnedCodeId ?? ""}
+                  onChange={(e) => setPinnedCodeId(e.target.value || null)}
+                >
+                  <option value="">Auto by type</option>
+                  {codeSet.codes.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.label} · {c.short}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              {acceptedCount > 0 && (
+                <button className="mini-btn" onClick={applyCodeToAll}>
+                  Apply to all existing
+                </button>
+              )}
+
+              <p className="meta">
+                {codedCount > 0
+                  ? `${codedCount} coded · log page previewed below`
+                  : "Redact something to start the log."}
+              </p>
+            </>
+          )}
+        </div>
+
+        <div className={`categories${codesActive ? " coded" : ""}`}>
           {[...PATTERNS.map((p) => p.id), CUSTOM_PATTERN_ID].map((cat) => {
             const items = byCategory.get(cat) ?? [];
             if (cat === CUSTOM_PATTERN_ID && customTerms.length === 0) return null;
@@ -242,8 +500,11 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
                             ...new Set(group.map((s) => s.pageIndex)),
                           ].sort((a, b) => a - b);
                           return (
-                            <li key={group[0].id}>
-                              <label>
+                            <li className="match-row" key={group[0].id}>
+                              {/* The checkbox label wraps only the hit text, so
+                                  operating the code picker doesn't toggle the
+                                  redaction. */}
+                              <label className="match-hit">
                                 <input
                                   type="checkbox"
                                   checked={allOn}
@@ -254,20 +515,87 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
                                     )
                                   }
                                 />
-                                <span className="match-text">
-                                  {group[0].text}
-                                </span>
-                                {group.length > 1 && (
-                                  <span className="match-count">
-                                    ×{group.length}
+                                <span className="match-main">
+                                  <span
+                                    className="match-text"
+                                    title={group[0].text}
+                                  >
+                                    {group[0].text}
                                   </span>
-                                )}
-                                <span className="match-page">
-                                  {pages.length === 1
-                                    ? `p${pages[0] + 1}`
-                                    : `${pages.length} pgs`}
+                                  {group.length > 1 && (
+                                    <span className="match-count">
+                                      ×{group.length}
+                                    </span>
+                                  )}
                                 </span>
                               </label>
+                              {codesActive && (
+                                <span className="code-cell">
+                                  {allOn &&
+                                    (() => {
+                                      const ids = new Set(
+                                        group.map((s) => s.codeId ?? ""),
+                                      );
+                                      const mixed = ids.size > 1;
+                                      const sharedId = mixed
+                                        ? null
+                                        : ([...ids][0] || null);
+                                      const shared = codeById(sharedId);
+                                      // A code set from the other authority
+                                      // still has to display correctly.
+                                      const foreign =
+                                        shared &&
+                                        !codeSet.codes.some(
+                                          (c) => c.id === shared.id,
+                                        );
+                                      return (
+                                        <select
+                                          className="code-select"
+                                          aria-label={`Exemption code for ${group[0].text}`}
+                                          title={
+                                            shared
+                                              ? `${shared.label} — ${shared.basis}`
+                                              : "No code — choose one"
+                                          }
+                                          value={
+                                            mixed ? "__mixed" : (sharedId ?? "")
+                                          }
+                                          onChange={(e) => {
+                                            if (e.target.value === "__mixed") return;
+                                            setCodeForGroup(
+                                              group.map((s) => s.id),
+                                              e.target.value || null,
+                                            );
+                                          }}
+                                        >
+                                          {mixed && (
+                                            <option value="__mixed">Mixed</option>
+                                          )}
+                                          <option value="">—</option>
+                                          {foreign && shared && (
+                                            <option value={shared.id}>
+                                              {shared.label}
+                                            </option>
+                                          )}
+                                          {codeSet.codes.map((c) => (
+                                            <option
+                                              key={c.id}
+                                              value={c.id}
+                                              title={c.basis}
+                                            >
+                                              {c.label}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      );
+                                    })()}
+                                </span>
+                              )}
+                              <span className="match-page">
+                                {pages.length === 1
+                                  ? `Page ${pages[0] + 1}`
+                                  : `${pages.length} pages`}
+                              </span>
                             </li>
                           );
                         })}
@@ -412,8 +740,35 @@ export default function Editor({ loaded, onClose, pro, onActivated }: Props) {
             onRemoveBox={removeManualBox}
             maxWidth={pageMaxWidth}
             drawEnabled={drawEnabled}
+            markerById={markerById}
+            scrollRoot={pagesRef.current}
           />
         ))}
+
+        {/* Live preview of the log that will be appended on export. */}
+        {logDoc &&
+          logPages.map((p) => (
+            <PageView
+              key={`log-${p.index}`}
+              doc={logDoc}
+              page={p}
+              suggestions={[]}
+              manualBoxes={[]}
+              onToggleSuggestion={() => {}}
+              onAddBox={() => {}}
+              onRemoveBox={() => {}}
+              maxWidth={pageMaxWidth}
+              drawEnabled={false}
+              markerById={markerById}
+              readOnly
+              scrollRoot={pagesRef.current}
+              label={
+                logPages.length > 1
+                  ? `Redaction log ${p.index + 1} of ${logPages.length} · appended on export`
+                  : "Redaction log · appended on export"
+              }
+            />
+          ))}
       </main>
 
       {showUpgrade && (

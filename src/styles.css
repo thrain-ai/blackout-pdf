@@ -562,7 +562,7 @@ footer a:hover {
 }
 
 .sidebar {
-  width: 320px;
+  width: 344px;
   flex-shrink: 0;
   background: var(--paper-dim);
   border-right: 1px solid var(--line);
@@ -702,13 +702,37 @@ footer a:hover {
   overflow-y: auto;
 }
 
-.category li label {
+/* Fixed columns keep the code pickers and page labels in true columns. */
+.category li.match-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 46px;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  padding: 4px 0;
+}
+
+.categories.coded .category li.match-row {
+  grid-template-columns: minmax(0, 1fr) 74px 46px;
+}
+
+.match-hit {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
-  padding: 3px 0;
+  min-width: 0;
   cursor: pointer;
+}
+
+.match-main {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.code-cell {
+  min-width: 0;
 }
 
 .category input[type="checkbox"] {
@@ -719,7 +743,6 @@ footer a:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  flex: 1;
 }
 
 .match-count {
@@ -734,8 +757,9 @@ footer a:hover {
 
 .match-page {
   color: var(--muted);
-  font-size: 11px;
-  flex-shrink: 0;
+  font-size: 11.5px;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .custom-term {
@@ -847,6 +871,189 @@ footer a:hover {
   opacity: 1;
 }
 
+/* ---------- exemption codes ---------- */
+
+.codes-panel {
+  background: #fff;
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  padding: 11px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.codes-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.codes-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.pro-tag {
+  background: var(--amber);
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* Master switch — amber only as an on-state signal. */
+.switch {
+  width: 38px;
+  height: 22px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper-deep);
+  position: relative;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+
+.switch .knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid var(--line);
+  transition: transform 0.16s ease;
+}
+
+.switch.on {
+  background: var(--amber);
+  border-color: var(--amber);
+}
+
+.switch.on .knob {
+  transform: translateX(16px);
+  border-color: rgba(0, 0, 0, 0.16);
+}
+
+/* Two code sets read better side by side than hidden in a dropdown. */
+.seg {
+  display: flex;
+  border: 1.5px solid var(--line);
+  border-radius: 7px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.seg-btn {
+  flex: 1;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  padding: 7px 6px;
+  cursor: pointer;
+}
+
+.seg-btn.on {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.field-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.codes-panel select {
+  width: 100%;
+  min-width: 0;
+  background: #fff;
+  border: 1.5px solid var(--line);
+  border-radius: 6px;
+  color: var(--ink);
+  padding: 7px 8px;
+  font-size: 12.5px;
+  font-family: inherit;
+}
+
+.codes-panel select:focus {
+  outline: none;
+  border-color: var(--ink);
+}
+
+.codes-panel .mini-btn {
+  align-self: flex-start;
+}
+
+/* Quiet neutral chip in a fixed grid column, so codes form a clean column
+   instead of ragged tags. */
+.code-badge,
+.code-select {
+  display: block;
+  background: var(--paper-deep);
+  color: var(--ink-soft);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-align: center;
+  padding: 2px 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Editable in place: the chip IS the picker, so a row looks identical until
+   someone needs the exception. */
+.code-select {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  font-family: inherit;
+  text-align-last: center;
+  cursor: pointer;
+}
+
+.code-select:hover,
+.code-select:focus {
+  border-color: var(--ink);
+  color: var(--ink);
+  outline: none;
+}
+
+/* The marker figure on a bar — mirrors what the export burns in. */
+.box-marker {
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
+}
+
 .export-area {
   margin-top: auto;
   padding-top: 12px;
@@ -878,6 +1085,14 @@ footer a:hover {
   color: var(--muted);
   font-size: 12px;
   margin-bottom: 6px;
+}
+
+/* The appended log preview announces itself. */
+.page-label.log {
+  color: var(--ink-soft);
+  font-weight: 700;
+  border-left: 3px solid var(--amber);
+  padding-left: 8px;
 }
 
 .page {
@@ -1127,7 +1342,7 @@ footer a:hover {
   }
 
   /* Comfortable touch targets in the sheet. */
-  .category li label {
+  .category li.match-row {
     padding: 7px 0;
   }
 
