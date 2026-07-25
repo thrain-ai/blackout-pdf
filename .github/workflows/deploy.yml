@@ -27,7 +27,17 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # The build prerenders the landing page in headless Chrome so that
+      # crawlers get real HTML instead of an empty <div id="root">.
+      # puppeteer-core ships no browser of its own; GitHub's ubuntu image
+      # has Chrome preinstalled, so point at it — and check it first, so a
+      # missing browser fails the build loudly instead of quietly
+      # deploying a blank page.
+      - name: Verify Chrome is available for prerender
+        run: google-chrome --version
       - run: npm run build
+        env:
+          CHROME_BIN: /usr/bin/google-chrome
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

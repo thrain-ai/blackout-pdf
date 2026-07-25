@@ -523,7 +523,14 @@ a {
 .btn:focus-visible {
   transform: translate(2px, 2px);
   box-shadow: 2px 2px 0 var(--amber);
-  outline: none;
+}
+
+/* Keyboard focus gets its own indicator. The press-in shift above is a hover
+   affordance — on its own it leaves keyboard users with no "you are here",
+   and on the Pro card the only cue was a brightness nudge. (WCAG 2.4.7, AA) */
+.btn:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 3px;
 }
 
 .btn:disabled {
@@ -544,6 +551,12 @@ a {
   box-shadow: none;
   transform: none;
   filter: brightness(1.08);
+}
+
+/* Ink on the dark Pro card is nearly invisible — the ring switches to amber
+   so the focus indicator keeps its contrast. */
+.tier.pro .btn:focus-visible {
+  outline-color: var(--amber);
 }
 
 .faq {
