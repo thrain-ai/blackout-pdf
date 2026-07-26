@@ -3,7 +3,8 @@ import type { LoadedDoc } from "../App.tsx";
 import type { ManualBox, Rect, Suggestion, PageInfo } from "../pdf/types.ts";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { findSuggestions } from "../pdf/textSearch.ts";
-import { exportRedacted, buildLogPreview, downloadBytes } from "../pdf/exporter.ts";
+import { exportRedacted, buildLogPreview } from "../pdf/exporter.ts";
+import { downloadBytes } from "../platform/browser.ts";
 import { loadPdf } from "../pdf/loader.ts";
 import { PATTERNS, CUSTOM_PATTERN_ID } from "../pdf/patterns.ts";
 import {

@@ -1,0 +1,44 @@
+{
+  "name": "@thrain/blackout",
+  "version": "1.0.0",
+  "description": "Permanently remove text from a PDF. Rasterises each page and rebuilds the file, so redacted text is gone rather than merely covered. Runs entirely locally.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "blackout": "dist/cli.mjs"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20.16.0"
+  },
+  "keywords": [
+    "redact",
+    "redaction",
+    "pdf",
+    "pii",
+    "ssn",
+    "foia",
+    "privacy",
+    "cli",
+    "mcp"
+  ],
+  "author": "Thrain LLC <support@thrain.ai>",
+  "homepage": "https://blackout.thrain.ai",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/thrain-ai/blackout-pdf.git",
+    "directory": "packages/blackout"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "^0.1.100",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^4.10.38"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

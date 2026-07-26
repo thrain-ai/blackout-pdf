@@ -10,6 +10,7 @@ import {
   WORKER_URL,
 } from "../config.ts";
 import RestorePurchase from "./RestorePurchase.tsx";
+import LicenseToken from "./LicenseToken.tsx";
 
 interface Props {
   onFile: (f: File) => void;
@@ -156,6 +157,7 @@ export default function Landing({ onFile, loading, error, pro }: Props) {
         <main className="pro-main">
           {dropzone}
           {error && <p className="error">{error}</p>}
+          <LicenseToken />
           <p className="trust-row">
             Nothing leaves your device — as always. ·{" "}
             <a href={`mailto:${CONTACT_EMAIL}`}>support</a>

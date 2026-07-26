@@ -1,0 +1,45 @@
+{
+  "name": "@thrain/blackout-mcp",
+  "version": "1.1.0",
+  "mcpName": "ai.thrain/blackout",
+  "description": "MCP server for permanent PDF redaction. Exposes redact_pdf and check_pdf; rasterises and rebuilds each page so redacted text is gone, not covered. Never uploads the document.",
+  "license": "MIT",
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "bin": {
+    "blackout-mcp": "dist/mcp.mjs"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20.16.0"
+  },
+  "keywords": [
+    "mcp",
+    "modelcontextprotocol",
+    "redact",
+    "redaction",
+    "pdf",
+    "pii",
+    "foia",
+    "privacy"
+  ],
+  "author": "Thrain LLC <support@thrain.ai>",
+  "homepage": "https://blackout.thrain.ai",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/thrain-ai/blackout-pdf.git",
+    "directory": "packages/blackout-mcp"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@napi-rs/canvas": "^0.1.100",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^4.10.38",
+    "zod": "^4.4.3"
+  }
+}

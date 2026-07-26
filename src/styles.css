@@ -92,6 +92,112 @@ a {
   margin-top: 0;
 }
 
+/* ---------- license token (Pro: take it to the CLI / an agent) ---------- */
+
+.license-token {
+  width: 100%;
+  max-width: 560px;
+}
+
+.license-token-toggle {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-size: 14px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.license-token-toggle:hover {
+  color: var(--ink);
+}
+
+.license-token-body {
+  margin-top: 12px;
+  padding: 16px 18px;
+  background: var(--paper-dim);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.license-token-body p {
+  color: var(--ink-soft);
+}
+
+.license-token-body code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  background: var(--paper-deep);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.license-token-label {
+  display: block;
+  margin: 14px 0 5px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.license-token-row {
+  display: flex;
+  gap: 6px;
+}
+
+.license-token-row input {
+  flex: 1;
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.license-token-row button {
+  flex: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.license-token-row button:hover {
+  background: var(--ink);
+  color: var(--amber);
+  border-color: var(--ink);
+}
+
+.license-token-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 9px;
+  color: var(--muted);
+}
+
+.license-token-icon:hover {
+  color: var(--amber);
+}
+
+.license-token-note {
+  margin-top: 14px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
 .landing {
   max-width: 920px;
   margin: 0 auto;
