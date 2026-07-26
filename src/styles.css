@@ -180,6 +180,18 @@ a {
   border-color: var(--ink);
 }
 
+.license-token-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 9px;
+  color: var(--muted);
+}
+
+.license-token-icon:hover {
+  color: var(--amber);
+}
+
 .license-token-note {
   margin-top: 14px;
   font-size: 13px;
