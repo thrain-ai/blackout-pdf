@@ -14,7 +14,7 @@ output back and counts the characters still extractable; if that number is not
 zero, it fails instead of writing a file.
 
 Everything happens on your machine. There is no upload, no API call, and no
-network access at any point — including the licence check, which verifies a
+network access at any point — including the license check, which verifies a
 signature offline.
 
 ## Use
@@ -37,7 +37,7 @@ file and never modifies the input.
 | `--out <file>` | Output path. Defaults to `<input>-redacted.pdf`. |
 | `--force` | Allow overwriting an existing output file. |
 | `--json` | Machine-readable result on stdout. |
-| `--licence <token>` | Pro licence token. Also read from `BLACKOUT_LICENCE`. |
+| `--license <token>` | Pro license token. Also read from `BLACKOUT_LICENSE`. |
 | `--quiet` | Suppress the human-readable summary. |
 
 Exit codes: `0` success, `1` failure, `2` usage error. With `--json`, failures
@@ -70,9 +70,14 @@ There is also an MCP server — [`@thrain/blackout-mcp`](../blackout-mcp) — ex
 
 ## Limits
 
-Free up to 10 pages per document. A Pro licence ($25, one-time) removes the
-limit; the same licence works in the browser app. Pass it with `--licence` or
-set `BLACKOUT_LICENCE`.
+Free up to 10 pages per document. A Pro license ($25, one-time) removes the
+limit; the same license works in the browser app. Pass it with `--license` or
+set `BLACKOUT_LICENSE`.
+
+Buy at [blackout.thrain.ai](https://blackout.thrain.ai), then expand **"Use
+Blackout from the terminal or an AI agent"** on the Pro screen to copy your
+token. It is verified offline against an embedded public key, so licensed runs
+still make no network calls.
 
 ## Also on the web
 

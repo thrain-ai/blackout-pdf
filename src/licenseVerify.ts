@@ -1,4 +1,4 @@
-// Offline licence verification — no DOM, no storage, no network.
+// Offline license verification — no DOM, no storage, no network.
 //
 // Split out of license.ts so the CLI and MCP server can verify a token without
 // dragging in localStorage and the browser-only activation flows. The logic is
@@ -7,7 +7,7 @@
 // Token format: base64url(JSON payload) + "." + base64url(ECDSA-P256 sig).
 // The private key lives only in the worker; we hold the public half, which can
 // check a token but never mint one. That is why this works with no network
-// call — and it must stay that way: a licence check that phones home would
+// call — and it must stay that way: a license check that phones home would
 // break the promise that the document never leaves the machine.
 import { LICENSE_PUBLIC_KEY } from "./config.ts";
 

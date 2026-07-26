@@ -31,7 +31,7 @@ handling a file full of Social Security numbers, that is the whole argument.
 }
 ```
 
-For unlimited page counts, add your licence:
+For unlimited page counts, add your license:
 
 ```json
 {
@@ -39,11 +39,22 @@ For unlimited page counts, add your licence:
     "blackout": {
       "command": "npx",
       "args": ["-y", "@thrain/blackout-mcp"],
-      "env": { "BLACKOUT_LICENCE": "<token>" }
+      "env": { "BLACKOUT_LICENSE": "<token>" }
     }
   }
 }
 ```
+
+### Where to find your token
+
+Buy Pro at [blackout.thrain.ai](https://blackout.thrain.ai) ($25, one-time). Once
+Pro is active, the Pro screen has a **"Use Blackout from the terminal or an AI
+agent"** section — expand it to copy your token, or the ready-made
+`export BLACKOUT_LICENSE=…` line.
+
+The same token works in the browser, the CLI, and here. It is verified offline
+against an embedded public key, so licensed runs still make no network calls.
+Treat it like a password.
 
 ## Tools
 
@@ -68,15 +79,15 @@ Writes a redacted copy. Never modifies the input.
 | `detect` | string[] | `ssn`, `card`, `email`, `phone`. Omit for all |
 | `terms` | string[] | Literal strings to match, case-insensitive |
 | `overwrite` | boolean | Allow replacing an existing output. Default `false` |
-| `licence` | string | Pro licence token; falls back to `BLACKOUT_LICENCE` |
+| `license` | string | Pro license token; falls back to `BLACKOUT_LICENSE` |
 
 Both return a human-readable summary followed by a JSON block with per-category
 counts, page count, and `extractableChars` — `0` on every successful redaction.
 
 ## Limits
 
-Free up to 10 pages per document. A Pro licence ($25, one-time) removes the
-limit and is the same licence the browser app uses.
+Free up to 10 pages per document. A Pro license ($25, one-time) removes the
+limit and is the same license the browser app uses.
 
 ## See also
 

@@ -3,7 +3,7 @@
 // It adds no redaction logic of its own. Detection is src/pdf/textSearch.ts,
 // ordering is src/pdf/marks.ts, and the burn-and-rebuild is
 // src/pdf/exporter.ts — the same modules the website runs. This file only
-// arranges them for a non-interactive caller and enforces the licence
+// arranges them for a non-interactive caller and enforces the license
 // boundary, which the browser UI enforces in its own way.
 import { installNodePlatform } from "../platform/node.ts";
 import { loadPdf } from "../pdf/loader.ts";
@@ -28,8 +28,8 @@ export interface ScanOptions {
   detect?: string[];
   /** Literal strings to redact wherever they appear, case-insensitive. */
   terms?: string[];
-  /** Signed licence token; lifts the free page limit when valid. */
-  licence?: string | null;
+  /** Signed license token; lifts the free page limit when valid. */
+  license?: string | null;
 }
 
 export interface CategoryCount {
@@ -62,18 +62,20 @@ export class BlackoutError extends Error {
 }
 
 /**
- * A licence is valid or it is not; there is no degraded middle state. The
+ * A license is valid or it is not; there is no degraded middle state. The
  * check is a local signature verification against the embedded public key —
  * it makes no network call, so a redaction still works with the machine
  * offline. That is deliberate and should stay that way.
  */
-export async function checkLicence(token: string | null | undefined): Promise<boolean> {
+export async function checkLicense(token: string | null | undefined): Promise<boolean> {
   if (!token) return false;
   return (await verifyToken(token.trim())).valid;
 }
 
-export function resolveLicence(explicit?: string | null): string | null {
-  return explicit ?? process.env.BLACKOUT_LICENCE ?? process.env.BLACKOUT_LICENSE ?? null;
+export function resolveLicense(explicit?: string | null): string | null {
+  // BLACKOUT_LICENSE is the documented name; BLACKOUT_LICENCE is kept because
+  // it shipped first and someone's shell profile still has it.
+  return explicit ?? process.env.BLACKOUT_LICENSE ?? process.env.BLACKOUT_LICENCE ?? null;
 }
 
 function normaliseDetect(detect: string[] | undefined, hasTerms: boolean): string[] {
@@ -150,7 +152,7 @@ function summarise(
 
 /** What would be redacted, without producing a file. */
 export async function scan(bytes: Uint8Array, opts: ScanOptions = {}): Promise<ScanResult> {
-  const licensed = await checkLicence(resolveLicence(opts.licence));
+  const licensed = await checkLicense(resolveLicense(opts.license));
   const { pages, suggestions, wanted } = await collect(bytes, opts);
   return summarise(pages, suggestions, wanted, licensed);
 }
@@ -172,13 +174,13 @@ export async function redact(
   bytes: Uint8Array,
   opts: ScanOptions = {},
 ): Promise<RedactResult> {
-  const licensed = await checkLicence(resolveLicence(opts.licence));
+  const licensed = await checkLicense(resolveLicense(opts.license));
   const { pages, suggestions, wanted } = await collect(bytes, opts);
 
   if (!licensed && pages > FREE_PAGE_LIMIT) {
     throw new BlackoutError(
       `This document has ${pages} pages; the free limit is ${FREE_PAGE_LIMIT}. ` +
-        `Supply a Pro licence via --licence or BLACKOUT_LICENCE to redact it.`,
+        `Supply a Pro license via --license or BLACKOUT_LICENSE to redact it.`,
       "PAGE_LIMIT",
     );
   }

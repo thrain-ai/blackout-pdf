@@ -11,7 +11,7 @@ import {
   FREE_PAGE_LIMIT,
   redact,
   scan,
-  resolveLicence,
+  resolveLicense,
   type ScanResult,
 } from "./engine.ts";
 
@@ -40,12 +40,12 @@ OPTIONS
   --out <file>       output path (default: <input>-redacted.pdf)
   --force            allow overwriting an existing output file
   --json             machine-readable result on stdout
-  --licence <token>  Pro licence token (or set BLACKOUT_LICENCE)
+  --license <token>  Pro license token (or set BLACKOUT_LICENSE)
   --quiet            suppress the human-readable summary
   -h, --help         this text
 
 LIMITS
-  Free up to ${FREE_PAGE_LIMIT} pages per document. A Pro licence removes the limit.
+  Free up to ${FREE_PAGE_LIMIT} pages per document. A Pro license removes the limit.
 
 EXAMPLES
   blackout redact filing.pdf --detect ssn,email --out clean.pdf
@@ -62,7 +62,7 @@ interface Args {
   force: boolean;
   json: boolean;
   quiet: boolean;
-  licence: string | null;
+  license: string | null;
   help: boolean;
 }
 
@@ -77,7 +77,7 @@ function parseArgs(argv: string[]): Args {
     force: false,
     json: false,
     quiet: false,
-    licence: null,
+    license: null,
     help: false,
   };
 
@@ -114,11 +114,11 @@ function parseArgs(argv: string[]): Args {
         args.terms.push(next(i, a));
         i++;
         break;
-      // Both spellings: the config and the codebase say "license", the flag in
-      // the docs says "licence", and an agent will guess one or the other.
-      case "--licence":
+      // "license" is the house spelling; "--licence" stays as a permanent alias
+      // because it shipped first and an agent will guess one or the other.
       case "--license":
-        args.licence = next(i, a);
+      case "--licence":
+        args.license = next(i, a);
         i++;
         break;
       case "--detect": {
@@ -182,7 +182,7 @@ async function main(argv: string[]): Promise<number> {
     throw new BlackoutError(`No such file: ${args.input}`, "NO_INPUT");
   }
   const bytes = new Uint8Array(await readFile(input));
-  const opts = { detect: args.detect, terms: args.terms, licence: args.licence };
+  const opts = { detect: args.detect, terms: args.terms, license: args.license };
 
   if (args.command === "check") {
     const result = await scan(bytes, opts);
@@ -200,7 +200,7 @@ async function main(argv: string[]): Promise<number> {
       if (!result.licensed && !result.withinFreeLimit) {
         process.stdout.write(
           `\n  Note: ${result.pages} pages exceeds the free limit of ${FREE_PAGE_LIMIT}; ` +
-            `redacting this file needs a Pro licence.\n`,
+            `redacting this file needs a Pro license.\n`,
         );
       }
     }
@@ -285,16 +285,16 @@ try {
   process.exitCode = usage ? EXIT_USAGE : EXIT_FAIL;
 }
 
-// A licence that fails to parse is worth saying out loud rather than silently
+// A license that fails to parse is worth saying out loud rather than silently
 // falling back to the free tier — an agent handing over a token and getting a
 // page-limit error otherwise has no way to tell why.
 if (process.exitCode === EXIT_OK && !wantsJson) {
-  const token = resolveLicence(null);
+  const token = resolveLicense(null);
   if (token && !argv.includes("--quiet")) {
-    const { checkLicence } = await import("./engine.ts");
-    if (!(await checkLicence(token))) {
+    const { checkLicense } = await import("./engine.ts");
+    if (!(await checkLicense(token))) {
       process.stderr.write(
-        "blackout: warning — BLACKOUT_LICENCE is set but not a valid token; running as free tier.\n",
+        "blackout: warning — BLACKOUT_LICENSE is set but not a valid token; running as free tier.\n",
       );
     }
   }

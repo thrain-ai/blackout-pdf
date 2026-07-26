@@ -116,6 +116,26 @@ export async function isLicensed(): Promise<boolean> {
   return (await verifyToken(value)).valid;
 }
 
+/**
+ * The stored license token, but only when it is a real signed token that the
+ * CLI and MCP server can actually verify offline. Legacy honor-system unlocks
+ * ("stripe:cs_…") and the dev placeholder are deliberately withheld: handing
+ * one of those to `BLACKOUT_LICENSE` would fail verification and look like a
+ * broken purchase rather than an old activation.
+ */
+export async function portableToken(): Promise<string | null> {
+  const value = stored();
+  if (!value) return null;
+  // Same dead-code-eliminated dev branch as activateFromUrl: ?dev_pro=1 should
+  // preview the whole Pro experience, token panel included, without a real
+  // purchase. Never reachable in a production build.
+  if (import.meta.env.DEV && value === "dev") {
+    return "eyJlIjoiZGV2QGV4YW1wbGUuY29tIn0.ZGV2LXNpZ25hdHVyZS1wbGFjZWhvbGRlcg";
+  }
+  if (value === "dev" || value.startsWith("stripe:")) return null;
+  return (await verifyToken(value)).valid ? value : null;
+}
+
 export async function requestRestoreEmail(
   email: string,
 ): Promise<{ ok: boolean; message: string }> {

@@ -50,13 +50,22 @@ const termsArg = z
       "addresses. Use this for anything the built-in detectors do not cover.",
   );
 
-const licenceArg = z
+const licenseArg = z
   .string()
   .optional()
   .describe(
-    `Pro licence token. Without one, documents over ${FREE_PAGE_LIMIT} pages are refused. ` +
-      "Falls back to the BLACKOUT_LICENCE environment variable.",
+    `Pro license token. Without one, documents over ${FREE_PAGE_LIMIT} pages are refused. ` +
+      "Falls back to the BLACKOUT_LICENSE environment variable. " +
+      "Find your token on the Pro screen at https://blackout.thrain.ai after purchase.",
   );
+
+// Shipped first as "licence"; kept so an existing caller doesn't silently fall
+// back to the free tier after the rename. Undocumented on purpose — the
+// description steers new callers to `license`.
+const licenceAliasArg = z
+  .string()
+  .optional()
+  .describe("Deprecated alias for `license`.");
 
 function summaryLines(r: ScanResult): string {
   const found = r.byCategory.filter((c) => c.count > 0);
@@ -107,7 +116,7 @@ server.registerTool(
       const limitNote =
         !result.licensed && !result.withinFreeLimit
           ? `\n\nNote: ${result.pages} pages exceeds the free limit of ${FREE_PAGE_LIMIT}; ` +
-            "redacting this document needs a Pro licence token."
+            "redacting this document needs a Pro license token."
           : "";
       return {
         content: [
@@ -152,11 +161,12 @@ server.registerTool(
         .boolean()
         .optional()
         .describe("Allow writing over an existing output file. Defaults to false."),
-      licence: licenceArg,
+      license: licenseArg,
+      licence: licenceAliasArg,
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
-  async ({ path, output_path, detect, terms, overwrite, licence }) => {
+  async ({ path, output_path, detect, terms, overwrite, license, licence }) => {
     try {
       const { abs, bytes } = await readPdf(path);
       const out = resolve(output_path ?? abs.replace(/\.pdf$/i, "") + "-redacted.pdf");
@@ -182,7 +192,7 @@ server.registerTool(
         }
       }
 
-      const result = await redact(bytes, { detect, terms, licence });
+      const result = await redact(bytes, { detect, terms, license: license ?? licence });
 
       // Never hand back a file that failed its own verification. An agent has
       // no way to eyeball the result, so a false success here is worse than
