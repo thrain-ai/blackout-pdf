@@ -2,8 +2,11 @@
   "name": "@thrain/blackout-mcp",
   "version": "1.0.0",
   "description": "MCP server for permanent PDF redaction. Exposes redact_pdf and check_pdf; rasterises and rebuilds each page so redacted text is gone, not covered. Never uploads the document.",
-  "private": true,
+  "license": "MIT",
   "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
   "bin": {
     "blackout-mcp": "dist/mcp.mjs"
   },
