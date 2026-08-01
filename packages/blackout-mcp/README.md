@@ -82,7 +82,13 @@ Writes a redacted copy. Never modifies the input.
 | `license` | string | Pro license token; falls back to `BLACKOUT_LICENSE` |
 
 Both return a human-readable summary followed by a JSON block with per-category
-counts, page count, and `extractableChars` — `0` on every successful redaction.
+counts, page count, `extractableChars` (`0` on every successful redaction), and
+`licenseState` — `"none"`, `"invalid"`, or `"valid"`.
+
+If a token is supplied and fails verification, `redact_pdf` on an over-limit
+document reports `LICENSE_INVALID` rather than the generic page-limit error, so
+an agent can tell "this needs a license" apart from "this license is wrong" and
+say something useful to the person who owns it.
 
 ## Limits
 

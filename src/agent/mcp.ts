@@ -16,6 +16,7 @@ import {
   CATEGORY_IDS,
   BlackoutError,
   FREE_PAGE_LIMIT,
+  VERSION,
   redact,
   scan,
   type ScanResult,
@@ -94,7 +95,7 @@ function toolError(err: unknown) {
 
 const server = new McpServer({
   name: "blackout",
-  version: "1.0.0",
+  version: VERSION,
 });
 
 server.registerTool(

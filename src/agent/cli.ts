@@ -9,9 +9,9 @@ import {
   CATEGORY_IDS,
   BlackoutError,
   FREE_PAGE_LIMIT,
+  VERSION,
   redact,
   scan,
-  resolveLicense,
   type ScanResult,
 } from "./engine.ts";
 
@@ -43,6 +43,7 @@ OPTIONS
   --license <token>  Pro license token (or set BLACKOUT_LICENSE)
   --quiet            suppress the human-readable summary
   -h, --help         this text
+  -V, --version      print the version and exit
 
 LIMITS
   Free up to ${FREE_PAGE_LIMIT} pages per document. A Pro license removes the limit.
@@ -64,6 +65,7 @@ interface Args {
   quiet: boolean;
   license: string | null;
   help: boolean;
+  version: boolean;
 }
 
 class UsageError extends Error {}
@@ -79,6 +81,7 @@ function parseArgs(argv: string[]): Args {
     quiet: false,
     license: null,
     help: false,
+    version: false,
   };
 
   const next = (i: number, flag: string): string => {
@@ -95,6 +98,10 @@ function parseArgs(argv: string[]): Args {
       case "-h":
       case "--help":
         args.help = true;
+        break;
+      case "-V":
+      case "--version":
+        args.version = true;
         break;
       case "--json":
         args.json = true;
@@ -165,8 +172,26 @@ function describe(result: ScanResult): string[] {
   return lines;
 }
 
+/**
+ * Surfaced on the success path, where the run still worked but quietly ran as
+ * free tier. The over-limit case is a hard LICENSE_INVALID error from the
+ * engine instead — there, the bad token is the whole reason the run failed.
+ */
+function warnIfLicenseInvalid(result: ScanResult, args: Args): void {
+  if (result.licenseState !== "invalid" || args.quiet || args.json) return;
+  process.stderr.write(
+    "blackout: warning — a license token was supplied but failed verification; " +
+      "running as free tier.\n",
+  );
+}
+
 async function main(argv: string[]): Promise<number> {
   const args = parseArgs(argv);
+
+  if (args.version) {
+    process.stdout.write(VERSION + "\n");
+    return EXIT_OK;
+  }
 
   if (args.help || !args.command) {
     process.stdout.write(USAGE);
@@ -204,6 +229,7 @@ async function main(argv: string[]): Promise<number> {
         );
       }
     }
+    warnIfLicenseInvalid(result, args);
     return EXIT_OK;
   }
 
@@ -264,6 +290,7 @@ async function main(argv: string[]): Promise<number> {
         `\n  verified: 0 characters of extractable text remain\n`,
     );
   }
+  warnIfLicenseInvalid(result.scan, args);
   return EXIT_OK;
 }
 
@@ -283,19 +310,4 @@ try {
     if (usage) process.stderr.write(`\nRun 'blackout --help' for usage.\n`);
   }
   process.exitCode = usage ? EXIT_USAGE : EXIT_FAIL;
-}
-
-// A license that fails to parse is worth saying out loud rather than silently
-// falling back to the free tier — an agent handing over a token and getting a
-// page-limit error otherwise has no way to tell why.
-if (process.exitCode === EXIT_OK && !wantsJson) {
-  const token = resolveLicense(null);
-  if (token && !argv.includes("--quiet")) {
-    const { checkLicense } = await import("./engine.ts");
-    if (!(await checkLicense(token))) {
-      process.stderr.write(
-        "blackout: warning — BLACKOUT_LICENSE is set but not a valid token; running as free tier.\n",
-      );
-    }
-  }
 }

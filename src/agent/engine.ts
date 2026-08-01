@@ -17,6 +17,17 @@ import { FREE_PAGE_LIMIT } from "../config.ts";
 
 installNodePlatform();
 
+/**
+ * Replaced at bundle time by scripts/build-agent.mjs with the version from the
+ * package being built, which is also what the MCP handshake reports. Hardcoding
+ * it here once meant the shipped server claimed 1.0.0 while the package said
+ * 1.1.0 for an entire release; the define plus the check in the build script
+ * make that drift impossible rather than merely fixed.
+ */
+declare const __BLACKOUT_VERSION__: string | undefined;
+export const VERSION =
+  typeof __BLACKOUT_VERSION__ === "string" ? __BLACKOUT_VERSION__ : "0.0.0-dev";
+
 export const CATEGORY_IDS = PATTERNS.map((p) => p.id);
 export const CATEGORY_LABELS: Record<string, string> = Object.fromEntries(
   PATTERNS.map((p) => [p.id, p.label]),
@@ -38,6 +49,14 @@ export interface CategoryCount {
   count: number;
 }
 
+/**
+ * "invalid" means a token WAS supplied (flag, param, or env) and failed
+ * signature verification — a different situation from "none", and one the
+ * caller must be able to tell apart: "supply a license" is the wrong advice
+ * for someone who already did.
+ */
+export type LicenseState = "none" | "invalid" | "valid";
+
 export interface ScanResult {
   pages: number;
   total: number;
@@ -45,6 +64,7 @@ export interface ScanResult {
   /** Per-page counts, index 0 = page 1. */
   perPage: number[];
   licensed: boolean;
+  licenseState: LicenseState;
   freePageLimit: number;
   withinFreeLimit: boolean;
 }
@@ -76,6 +96,12 @@ export function resolveLicense(explicit?: string | null): string | null {
   // BLACKOUT_LICENSE is the documented name; BLACKOUT_LICENCE is kept because
   // it shipped first and someone's shell profile still has it.
   return explicit ?? process.env.BLACKOUT_LICENSE ?? process.env.BLACKOUT_LICENCE ?? null;
+}
+
+async function licenseStateOf(explicit?: string | null): Promise<LicenseState> {
+  const token = resolveLicense(explicit);
+  if (!token) return "none";
+  return (await checkLicense(token)) ? "valid" : "invalid";
 }
 
 function normaliseDetect(detect: string[] | undefined, hasTerms: boolean): string[] {
@@ -126,7 +152,7 @@ function summarise(
   pages: number,
   suggestions: Suggestion[],
   wanted: Set<string>,
-  licensed: boolean,
+  licenseState: LicenseState,
 ): ScanResult {
   const counts = new Map<string, number>();
   const perPage = new Array<number>(pages).fill(0);
@@ -144,7 +170,8 @@ function summarise(
       count: counts.get(id) ?? 0,
     })),
     perPage,
-    licensed,
+    licensed: licenseState === "valid",
+    licenseState,
     freePageLimit: FREE_PAGE_LIMIT,
     withinFreeLimit: pages <= FREE_PAGE_LIMIT,
   };
@@ -152,9 +179,9 @@ function summarise(
 
 /** What would be redacted, without producing a file. */
 export async function scan(bytes: Uint8Array, opts: ScanOptions = {}): Promise<ScanResult> {
-  const licensed = await checkLicense(resolveLicense(opts.license));
+  const licenseState = await licenseStateOf(opts.license);
   const { pages, suggestions, wanted } = await collect(bytes, opts);
-  return summarise(pages, suggestions, wanted, licensed);
+  return summarise(pages, suggestions, wanted, licenseState);
 }
 
 export interface RedactResult {
@@ -174,10 +201,23 @@ export async function redact(
   bytes: Uint8Array,
   opts: ScanOptions = {},
 ): Promise<RedactResult> {
-  const licensed = await checkLicense(resolveLicense(opts.license));
+  const licenseState = await licenseStateOf(opts.license);
   const { pages, suggestions, wanted } = await collect(bytes, opts);
 
-  if (!licensed && pages > FREE_PAGE_LIMIT) {
+  if (licenseState !== "valid" && pages > FREE_PAGE_LIMIT) {
+    // Two different problems, two different fixes — and telling someone who
+    // already supplied a token to "supply a license" sends them in exactly
+    // the wrong direction.
+    if (licenseState === "invalid") {
+      throw new BlackoutError(
+        `This document has ${pages} pages; the free limit is ${FREE_PAGE_LIMIT}. ` +
+          `A license token WAS supplied but failed verification — it is not the ` +
+          `problem that no license exists, but that this one does not check out. ` +
+          `Re-copy the full token from the Pro screen at https://blackout.thrain.ai ` +
+          `(watch for truncation or stray whitespace).`,
+        "LICENSE_INVALID",
+      );
+    }
     throw new BlackoutError(
       `This document has ${pages} pages; the free limit is ${FREE_PAGE_LIMIT}. ` +
         `Supply a Pro license via --license or BLACKOUT_LICENSE to redact it.`,
@@ -209,7 +249,7 @@ export async function redact(
 
   return {
     pdf,
-    scan: summarise(pages, suggestions, wanted, licensed),
+    scan: summarise(pages, suggestions, wanted, licenseState),
     extractableChars: await extractableTextLength(pdf),
   };
 }

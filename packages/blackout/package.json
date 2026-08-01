@@ -1,6 +1,6 @@
 {
   "name": "@thrain/blackout",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Permanently remove text from a PDF. Rasterises each page and rebuilds the file, so redacted text is gone rather than merely covered. Runs entirely locally.",
   "license": "MIT",
   "type": "module",
