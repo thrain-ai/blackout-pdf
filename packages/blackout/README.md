@@ -39,9 +39,15 @@ file and never modifies the input.
 | `--json` | Machine-readable result on stdout. |
 | `--license <token>` | Pro license token. Also read from `BLACKOUT_LICENSE`. |
 | `--quiet` | Suppress the human-readable summary. |
+| `-V`, `--version` | Print the version and exit. |
 
 Exit codes: `0` success, `1` failure, `2` usage error. With `--json`, failures
 print `{"ok": false, "code": "...", "error": "..."}` on stdout.
+
+Error codes worth branching on: `PAGE_LIMIT` (over the free limit, no license
+supplied) and `LICENSE_INVALID` (a token *was* supplied and failed
+verification). These are deliberately distinct — "buy a license" is the wrong
+response to a token that is merely mistyped or truncated.
 
 ## For agents
 
@@ -60,10 +66,15 @@ npx @thrain/blackout check filing.pdf --json
   "total": 6,
   "byCategory": [{ "id": "ssn", "label": "Social Security numbers", "count": 1 }],
   "licensed": false,
+  "licenseState": "none",
   "freePageLimit": 10,
   "withinFreeLimit": true
 }
 ```
+
+`licenseState` is `"none"`, `"invalid"`, or `"valid"`. `"invalid"` means a token
+was supplied and failed verification — worth surfacing to whoever supplied it
+rather than quietly running as free tier.
 
 There is also an MCP server — [`@thrain/blackout-mcp`](../blackout-mcp) — exposing
 `redact_pdf` and `check_pdf` over the Model Context Protocol.

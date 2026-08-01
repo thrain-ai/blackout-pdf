@@ -47,16 +47,26 @@ async function extractText(buf) {
 }
 
 // Never throws on a non-zero exit — the exit code is part of what we assert.
-async function cli(args) {
+async function cliEnv(args, extraEnv = {}) {
+  // A stray BLACKOUT_LICENSE in the ambient environment would make the
+  // license assertions below lie, so the base env is scrubbed of both
+  // spellings and each case opts in to exactly what it wants to test.
+  const env = { ...process.env, ...extraEnv };
+  for (const key of ["BLACKOUT_LICENSE", "BLACKOUT_LICENCE"]) {
+    if (!(key in extraEnv)) delete env[key];
+  }
   try {
     const { stdout, stderr } = await run("node", [CLI, ...args], {
       maxBuffer: 32 * 1024 * 1024,
+      env,
     });
     return { code: 0, stdout, stderr };
   } catch (err) {
     return { code: err.code ?? 1, stdout: err.stdout ?? "", stderr: err.stderr ?? "" };
   }
 }
+
+const cli = (args) => cliEnv(args);
 
 const dir = await mkdtemp(join(tmpdir(), "blackout-cli-smoke-"));
 console.log("CLI under test:", CLI);
@@ -167,15 +177,89 @@ try {
     else ok("no output file written when the limit is exceeded");
   }
 
-  // --- an invalid licence must not silently unlock --------------------------
+  // --- an invalid license must not silently unlock --------------------------
+  // Regression: a bad token used to produce a plain PAGE_LIMIT error telling
+  // the caller to "supply a Pro license" — advice that is actively wrong for
+  // someone who already supplied one. The two cases must stay distinguishable.
   {
     const { code, stdout } = await cli([
-      "redact", big, "--licence", "not.a.real.token", "--out", join(dir, "big2.pdf"), "--json",
+      "redact", big, "--license", "not.a.real.token", "--out", join(dir, "big2.pdf"), "--json",
     ]);
     const r = JSON.parse(stdout);
-    if (code === 0) fail("a bogus licence token unlocked the page limit");
-    else if (r.code !== "PAGE_LIMIT") fail(`expected PAGE_LIMIT for bogus token, got ${r.code}`);
-    else ok("a forged licence token does not unlock the page limit");
+    if (code === 0) fail("a bogus license token unlocked the page limit");
+    else if (r.code !== "LICENSE_INVALID") {
+      fail(`a supplied-but-invalid token should report LICENSE_INVALID, got ${r.code}`);
+    } else if (/supply a pro license/i.test(r.error)) {
+      fail("LICENSE_INVALID still tells the caller to supply a license they already supplied");
+    } else ok("a forged license token reports LICENSE_INVALID, not a misleading PAGE_LIMIT");
+
+    // No token at all is a different problem and keeps the original code.
+    const none = await cli(["redact", big, "--out", join(dir, "big3.pdf"), "--json"]);
+    const nr = JSON.parse(none.stdout);
+    if (nr.code !== "PAGE_LIMIT") fail(`no token should report PAGE_LIMIT, got ${nr.code}`);
+    else ok("no license at all still reports PAGE_LIMIT");
+
+    // The deprecated spelling must keep working — it shipped, and dropping it
+    // would silently downgrade existing callers to the free tier.
+    const alias = await cli([
+      "redact", big, "--licence", "not.a.real.token", "--out", join(dir, "big4.pdf"), "--json",
+    ]);
+    if (JSON.parse(alias.stdout).code !== "LICENSE_INVALID") {
+      fail("--licence alias no longer reaches the license check");
+    } else ok("--licence alias still honoured");
+
+    // Same via the environment variable, both spellings.
+    for (const key of ["BLACKOUT_LICENSE", "BLACKOUT_LICENCE"]) {
+      const res = await cliEnv(
+        ["redact", big, "--out", join(dir, `env-${key}.pdf`), "--json"],
+        { [key]: "not.a.real.token" },
+      );
+      if (JSON.parse(res.stdout).code !== "LICENSE_INVALID") {
+        fail(`${key} with an invalid token did not report LICENSE_INVALID`);
+      } else ok(`${key} invalid token reports LICENSE_INVALID`);
+    }
+  }
+
+  // --- an invalid token on a SUCCEEDING run still warns ---------------------
+  // The old warning was gated on a zero exit code and unreachable in the case
+  // it was written for; this one has to actually appear.
+  {
+    const res = await cliEnv(["check", src], { BLACKOUT_LICENSE: "not.a.real.token" });
+    if (res.code !== 0) fail(`check with a bad token should still succeed, got ${res.code}`);
+    else if (!/failed verification/i.test(res.stderr)) {
+      fail("no warning when a supplied token is invalid on a successful run");
+    } else ok("an invalid token warns on stderr even when the run succeeds");
+
+    // --json output must stay machine-parseable: the warning goes to stderr.
+    const j = await cliEnv(["check", src, "--json"], { BLACKOUT_LICENSE: "not.a.real.token" });
+    try {
+      const parsed = JSON.parse(j.stdout);
+      if (parsed.licenseState !== "invalid") {
+        fail(`--json should report licenseState "invalid", got ${parsed.licenseState}`);
+      } else ok('--json reports licenseState:"invalid" and stdout stays valid JSON');
+    } catch {
+      fail("the license warning corrupted --json stdout");
+    }
+  }
+
+  // --- the version the binary reports matches the package it ships in -------
+  {
+    const { code, stdout } = await cli(["--version"]);
+    const reported = stdout.trim();
+    if (code !== 0) fail(`--version exited ${code}`);
+    else if (!/^\d+\.\d+\.\d+/.test(reported)) fail(`--version printed "${reported}"`);
+    else ok(`--version reports ${reported}`);
+
+    // Only meaningful against a built bundle; running from source has no
+    // package.json to compare with and reports the dev placeholder.
+    if (CLI.endsWith(".mjs")) {
+      const pkg = JSON.parse(
+        await readFile(new URL("../packages/blackout/package.json", import.meta.url), "utf8"),
+      );
+      if (reported !== pkg.version) {
+        fail(`binary reports ${reported} but package.json says ${pkg.version}`);
+      } else ok(`reported version matches package.json (${pkg.version})`);
+    }
   }
 
   // --- destructive-action guards -------------------------------------------

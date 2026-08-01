@@ -54,6 +54,25 @@ try {
   await client.connect(transport);
   ok("connected to the MCP server over stdio");
 
+  // Regression: the handshake version was hardcoded and sat at 1.0.0 while the
+  // package shipped 1.1.0 for a whole release. Every client sees this on
+  // connect, so a stale value is a false claim about what is running.
+  {
+    const info = client.getServerVersion();
+    if (!info?.version) {
+      fail("server advertised no version in the handshake");
+    } else if (SERVER.endsWith(".mjs")) {
+      const pkg = JSON.parse(
+        await readFile(new URL("../packages/blackout-mcp/package.json", import.meta.url), "utf8"),
+      );
+      if (info.version !== pkg.version) {
+        fail(`handshake reports ${info.version} but package.json says ${pkg.version}`);
+      } else ok(`handshake version matches package.json (${info.version})`);
+    } else {
+      ok(`handshake advertises version ${info.version}`);
+    }
+  }
+
   const src = join(dir, "input.pdf");
   await run("node", [new URL("./make-test-pdf.mjs", import.meta.url).pathname, src, "1"]);
 
