@@ -8,7 +8,8 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { readFile, mkdtemp, rm, stat } from "node:fs/promises";
+import { readFile, writeFile, mkdtemp, rm, stat } from "node:fs/promises";
+import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -161,6 +162,63 @@ try {
     });
     if (!missing.isError) fail("missing file did not surface as an error");
     else ok("missing input surfaces as a tool error, not a crash");
+  }
+  // --- nothing but JSON-RPC may appear on stdout ---------------------------
+  // Here stdout IS the transport. pdf.js logs warnings via console.log, so a
+  // document with a damaged xref used to inject bare "Warning: ..." lines into
+  // the protocol stream. The SDK client happened to tolerate it; a stricter
+  // client is entitled to drop the session. Drive the server raw and read every
+  // byte it emits.
+  {
+    const damaged = join(dir, "damaged.pdf");
+    const text = (await readFile(src)).toString("latin1");
+    const eol = text.indexOf("\n", text.lastIndexOf("startxref"));
+    await writeFile(
+      damaged,
+      Buffer.from(
+        text.slice(0, eol + 1) + "999999\n" + text.slice(text.indexOf("%%EOF", eol)),
+        "latin1",
+      ),
+    );
+
+    const raw = await new Promise((resolve) => {
+      const p = spawn("node", [SERVER], { stdio: ["pipe", "pipe", "pipe"] });
+      let out = "";
+      p.stdout.on("data", (d) => (out += d));
+      p.on("close", () => resolve(out));
+      const send = (o) => p.stdin.write(JSON.stringify(o) + "\n");
+      send({
+        jsonrpc: "2.0", id: 1, method: "initialize",
+        params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "raw", version: "1" } },
+      });
+      send({ jsonrpc: "2.0", method: "notifications/initialized" });
+      send({
+        jsonrpc: "2.0", id: 2, method: "tools/call",
+        params: {
+          name: "redact_pdf",
+          arguments: { path: damaged, output_path: join(dir, "raw-out.pdf"), overwrite: true },
+        },
+      });
+      setTimeout(() => p.kill(), 60000);
+    });
+
+    const offending = raw
+      .split("\n")
+      .filter((l) => l.trim())
+      .filter((l) => {
+        try {
+          JSON.parse(l);
+          return false;
+        } catch {
+          return true;
+        }
+      });
+    if (offending.length) {
+      fail(
+        `${offending.length} non-protocol line(s) injected into the MCP stdout stream: ` +
+          JSON.stringify(offending[0].slice(0, 80)),
+      );
+    } else ok("MCP stdout carries only JSON-RPC, even on a PDF that provokes pdf.js warnings");
   }
 } finally {
   await client.close().catch(() => {});

@@ -12,6 +12,9 @@ import { resolve, basename } from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+// Must come before anything that can touch a PDF: stdout here IS the JSON-RPC
+// transport, and a pdf.js warning landing in it is a protocol violation.
+import { protectStdout } from "./stdout-guard.ts";
 import {
   CATEGORY_IDS,
   BlackoutError,
@@ -21,6 +24,8 @@ import {
   scan,
   type ScanResult,
 } from "./engine.ts";
+
+protectStdout();
 
 const PERMANENCE_CLAIM =
   "Permanently removes text from a PDF. Drawing a black rectangle over text does NOT " +

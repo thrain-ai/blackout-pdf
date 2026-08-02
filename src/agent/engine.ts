@@ -121,11 +121,40 @@ function normaliseDetect(detect: string[] | undefined, hasTerms: boolean): strin
   return detect;
 }
 
+const MIN_TERM_LENGTH = 2;
+
+/**
+ * A one-character term would match on nearly every line and black out the whole
+ * document, so short terms are refused rather than run.
+ *
+ * They used to be silently filtered out — which was worse than it sounds. The
+ * filtered list also decided whether the caller had asked for terms at all, so
+ * `--term "J"` dropped the term AND fell back to detecting every built-in
+ * category, redacting content the caller never mentioned. Silent over-redaction
+ * destroys information the user meant to keep, and they had no way to know it
+ * happened. Refusing loudly is the only safe answer.
+ */
+function checkTerms(raw: string[]): string[] {
+  const present = raw.map((t) => t.trim()).filter((t) => t.length > 0);
+  const tooShort = present.filter((t) => t.length < MIN_TERM_LENGTH);
+  if (tooShort.length) {
+    throw new BlackoutError(
+      `Search terms must be at least ${MIN_TERM_LENGTH} characters: ` +
+        `${tooShort.map((t) => JSON.stringify(t)).join(", ")}. ` +
+        `A shorter term would match almost everywhere and redact the whole document.`,
+      "TERM_TOO_SHORT",
+    );
+  }
+  return present;
+}
+
 async function collect(
   bytes: Uint8Array,
   opts: ScanOptions,
 ): Promise<{ pages: number; suggestions: Suggestion[]; wanted: Set<string> }> {
-  const terms = (opts.terms ?? []).filter((t) => t.trim().length >= 2);
+  // Whether the caller asked for terms is decided by what they actually passed,
+  // never by what survived filtering.
+  const terms = checkTerms(opts.terms ?? []);
   const detect = normaliseDetect(opts.detect, terms.length > 0);
   const wanted = new Set([...detect, ...(terms.length ? [CUSTOM_PATTERN_ID] : [])]);
 
