@@ -279,6 +279,110 @@ try {
     if (!stillLeaks.includes(SECRETS[0])) fail("the input file was modified");
   }
 
+  // --- stdout stays parseable even when pdf.js complains -------------------
+  // The original version of this suite only ever fed the CLI a pristine
+  // fixture, so it certified "--json is valid JSON" while a damaged PDF was
+  // corrupting it in the field. pdf.js logs warnings through console.log, which
+  // is stdout in Node. Any document that provokes one must not break the
+  // contract that agents parse stdout.
+  {
+    const damaged = join(dir, "damaged.pdf");
+    const original = await readFile(src);
+    const text = original.toString("latin1");
+    const marker = text.lastIndexOf("startxref");
+    const eol = text.indexOf("\n", marker);
+    // A startxref pointing into space forces pdf.js to rebuild the xref table,
+    // which it announces loudly — the same thing real scanned and recovered
+    // documents do.
+    await writeFile(
+      damaged,
+      Buffer.from(
+        text.slice(0, eol + 1) + "999999\n" + text.slice(text.indexOf("%%EOF", eol)),
+        "latin1",
+      ),
+    );
+
+    const res = await cli(["redact", damaged, "--out", join(dir, "damaged-out.pdf"), "--json"]);
+    if (res.code !== 0) {
+      fail(`redacting a damaged-xref PDF failed outright: ${res.stdout}${res.stderr}`);
+    } else {
+      try {
+        const parsed = JSON.parse(res.stdout);
+        if (!parsed.ok) fail("damaged PDF reported not-ok");
+        else ok("--json stdout stays parseable on a PDF that provokes pdf.js warnings");
+      } catch (e) {
+        fail(`pdf.js chatter corrupted --json stdout: ${res.stdout.slice(0, 120)}`);
+      }
+      if (!/warning/i.test(res.stderr)) {
+        // Not fatal, but the diagnostics should survive rather than vanish.
+        console.log("  note: no warning seen on stderr for the damaged fixture");
+      } else ok("pdf.js warnings are preserved on stderr, not discarded");
+    }
+  }
+
+  // --- short --term must refuse, not silently redact everything ------------
+  // Regression: `--term "J"` used to drop the term AND re-enable every built-in
+  // detector, blacking out content the caller never asked about.
+  {
+    const res = await cli(["check", src, "--term", "J", "--json"]);
+    if (res.code === 0) {
+      fail("a 1-character --term was accepted; it should be refused");
+    } else {
+      const r = JSON.parse(res.stdout);
+      if (r.code !== "TERM_TOO_SHORT") fail(`expected TERM_TOO_SHORT, got ${r.code}`);
+      else ok("a too-short --term is refused rather than silently widening the scan");
+      if (res.code !== 2) fail(`TERM_TOO_SHORT should exit 2 (usage), got ${res.code}`);
+      else ok("TERM_TOO_SHORT exits 2");
+    }
+  }
+
+  // --- --version must not stand in for doing the work ----------------------
+  {
+    const out = join(dir, "version-noop.pdf");
+    const res = await cli(["redact", src, "--out", out, "--version"]);
+    if (res.code === 0) fail("--version alongside a command exited 0 without redacting");
+    else ok("--version combined with a command is a usage error, not a silent no-op");
+    let wrote = true;
+    try {
+      await stat(out);
+    } catch {
+      wrote = false;
+    }
+    if (wrote) fail("a file was written on the --version path");
+
+    const alone = await cli(["--version"]);
+    if (alone.code !== 0 || !/^\d+\.\d+\.\d+/.test(alone.stdout.trim())) {
+      fail(`bare --version should still work, got ${alone.code}/${alone.stdout.trim()}`);
+    } else ok("bare --version still works");
+  }
+
+  // --- --quiet must not hide a failed license ------------------------------
+  {
+    const res = await cliEnv(["check", src, "--quiet"], { BLACKOUT_LICENSE: "not.a.real.token" });
+    if (!/failed verification/i.test(res.stderr)) {
+      fail("--quiet suppressed the invalid-license warning");
+    } else ok("--quiet still surfaces an invalid license on stderr");
+  }
+
+  // --- machine callers get JSON even when they misuse the CLI --------------
+  {
+    const res = await cli(["--json"]);
+    try {
+      const r = JSON.parse(res.stdout);
+      if (r.ok !== false || r.code !== "USAGE") fail(`unexpected no-command JSON: ${res.stdout}`);
+      else ok("--json with no command returns a JSON usage error, not help text");
+    } catch {
+      fail(`--json with no command emitted non-JSON: ${res.stdout.slice(0, 80)}`);
+    }
+  }
+
+  // --- bad detector is a usage mistake, like every other bad argument ------
+  {
+    const res = await cli(["check", src, "--detect", "bogus"]);
+    if (res.code !== 2) fail(`BAD_DETECTOR should exit 2 (usage), got ${res.code}`);
+    else ok("BAD_DETECTOR exits 2, consistent with other argument mistakes");
+  }
+
   // --- usage errors are distinguishable from failures ----------------------
   {
     const { code } = await cli(["check", src, "--nonsense"]);

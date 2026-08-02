@@ -5,6 +5,9 @@
 // every failure, and no interactive prompts anywhere.
 import { readFile, writeFile, access } from "node:fs/promises";
 import { resolve, basename } from "node:path";
+// Before any PDF work: --json promises parseable stdout, and pdf.js logs its
+// warnings there unless told otherwise.
+import { protectStdout } from "./stdout-guard.ts";
 import {
   CATEGORY_IDS,
   BlackoutError,
@@ -15,9 +18,16 @@ import {
   type ScanResult,
 } from "./engine.ts";
 
+protectStdout();
+
 const EXIT_OK = 0;
 const EXIT_FAIL = 1;
 const EXIT_USAGE = 2;
+
+// Engine errors that are really the caller mis-invoking us, not the run
+// failing. These exit 2 like any other usage mistake, so a script can tell
+// "you asked wrong" from "it didn't work".
+const USAGE_CODES = new Set(["BAD_DETECTOR", "TERM_TOO_SHORT"]);
 
 const USAGE = `blackout — permanently remove text from a PDF
 
@@ -92,9 +102,21 @@ function parseArgs(argv: string[]): Args {
     return v;
   };
 
+  let noMoreFlags = false;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
+    // Everything after `--` is a positional, so a file legitimately named
+    // "-weird.pdf" can still be passed.
+    if (noMoreFlags) {
+      if (!args.command) args.command = a;
+      else if (!args.input) args.input = a;
+      else throw new UsageError(`Unexpected argument: ${a}`);
+      continue;
+    }
     switch (a) {
+      case "--":
+        noMoreFlags = true;
+        break;
       case "-h":
       case "--help":
         args.help = true;
@@ -178,7 +200,10 @@ function describe(result: ScanResult): string[] {
  * engine instead — there, the bad token is the whole reason the run failed.
  */
 function warnIfLicenseInvalid(result: ScanResult, args: Args): void {
-  if (result.licenseState !== "invalid" || args.quiet || args.json) return;
+  // Not suppressed by --quiet: that hides the summary, and someone who paid for
+  // Pro silently running as free tier is not a detail to tidy away. Suppressed
+  // under --json only because licenseState carries the same fact in-band.
+  if (result.licenseState !== "invalid" || args.json) return;
   process.stderr.write(
     "blackout: warning — a license token was supplied but failed verification; " +
       "running as free tier.\n",
@@ -189,12 +214,27 @@ async function main(argv: string[]): Promise<number> {
   const args = parseArgs(argv);
 
   if (args.version) {
+    // Combined with a command it is almost certainly a mistake, and honouring
+    // it would exit 0 having redacted nothing — a scripted caller would read
+    // that as success.
+    if (args.command) {
+      throw new UsageError("--version cannot be combined with a command");
+    }
     process.stdout.write(VERSION + "\n");
     return EXIT_OK;
   }
 
   if (args.help || !args.command) {
-    process.stdout.write(USAGE);
+    // --json means the caller is a program: give it something parseable rather
+    // than a wall of help text.
+    if (args.json) {
+      const payload = args.help
+        ? { ok: true, version: VERSION, commands: ["redact", "check"], detectors: CATEGORY_IDS }
+        : { ok: false, code: "USAGE", error: "No command given. Expected 'redact' or 'check'." };
+      process.stdout.write(JSON.stringify(payload, null, 2) + "\n");
+    } else {
+      process.stdout.write(USAGE);
+    }
     return args.help ? EXIT_OK : EXIT_USAGE;
   }
   if (args.command !== "redact" && args.command !== "check") {
@@ -223,9 +263,15 @@ async function main(argv: string[]): Promise<number> {
           "\n",
       );
       if (!result.licensed && !result.withinFreeLimit) {
+        // Same distinction redact makes: telling someone who supplied a token
+        // that they need one is the bug PR #20 fixed, and it lived on here.
         process.stdout.write(
-          `\n  Note: ${result.pages} pages exceeds the free limit of ${FREE_PAGE_LIMIT}; ` +
-            `redacting this file needs a Pro license.\n`,
+          result.licenseState === "invalid"
+            ? `\n  Note: ${result.pages} pages exceeds the free limit of ${FREE_PAGE_LIMIT}, ` +
+              `and the license token supplied failed verification — re-copy it from ` +
+              `the Pro screen at https://blackout.thrain.ai.\n`
+            : `\n  Note: ${result.pages} pages exceeds the free limit of ${FREE_PAGE_LIMIT}; ` +
+              `redacting this file needs a Pro license.\n`,
         );
       }
     }
@@ -300,8 +346,8 @@ const wantsJson = argv.includes("--json");
 try {
   process.exitCode = await main(argv);
 } catch (err) {
-  const usage = err instanceof UsageError;
-  const code = err instanceof BlackoutError ? err.code : usage ? "USAGE" : "ERROR";
+  const code = err instanceof BlackoutError ? err.code : err instanceof UsageError ? "USAGE" : "ERROR";
+  const usage = err instanceof UsageError || USAGE_CODES.has(code);
   const message = err instanceof Error ? err.message : String(err);
   if (wantsJson) {
     process.stdout.write(JSON.stringify({ ok: false, code, error: message }, null, 2) + "\n");
