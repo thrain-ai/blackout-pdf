@@ -2,6 +2,19 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+
+    <!-- Content-Security-Policy: the browser-enforced backstop for "nothing
+         leaves your device". connect-src is the load-bearing line — it pins
+         outbound requests to this origin and the license worker, so even a
+         compromised dependency cannot POST a loaded PDF anywhere else. Keep
+         connect-src in sync with WORKER_URL in src/config.ts. Framing, HSTS,
+         nosniff and referrer are set as real headers at the edge (they cannot
+         be delivered via <meta>). -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://blackout-license.thrain.workers.dev; worker-src 'self' blob:; form-action 'self'"
+    />
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <!-- Keyword-first. "Blackout" alone is a word we cannot own — three other
