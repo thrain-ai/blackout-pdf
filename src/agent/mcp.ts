@@ -79,6 +79,23 @@ function summaryLines(r: ScanResult): string {
   return found.map((c) => `  ${c.count} × ${c.label}`).join("\n");
 }
 
+/**
+ * A page with imagery but no text layer is invisible to the text detectors, so
+ * a scanned document could come back with nothing found. An agent has no eyes
+ * on the file, so this has to be stated rather than left to silence.
+ */
+function imageOnlyNote(r: ScanResult): string {
+  const p = r.imageOnlyPages;
+  if (!p.length) return "";
+  const noun = p.length === 1 ? `Page ${p[0]} has` : `Pages ${p.join(", ")} have`;
+  return (
+    `\n\nNote: ${noun} no text layer (scanned or image-only), so the automatic ` +
+    `detectors could not read ${p.length === 1 ? "it" : "them"}. Any text there ` +
+    `was not detected — OCR or review ${p.length === 1 ? "that page" : "those pages"} ` +
+    `before relying on this copy.`
+  );
+}
+
 async function readPdf(path: string): Promise<{ abs: string; bytes: Uint8Array }> {
   const abs = resolve(path);
   try {
@@ -132,6 +149,7 @@ server.registerTool(
               `${basename(abs)} — ${result.pages} page(s), ${result.total} item(s) would be redacted:\n` +
               summaryLines(result) +
               limitNote +
+              imageOnlyNote(result) +
               `\n\n${JSON.stringify({ file: abs, ...result }, null, 2)}`,
           },
         ],
@@ -221,8 +239,10 @@ server.registerTool(
               `Redacted ${basename(abs)} → ${out}\n` +
               `${result.scan.pages} page(s) rasterised, ${result.scan.total} redaction(s) burned in:\n` +
               summaryLines(result.scan) +
-              "\n\nVerified: 0 characters of extractable text remain in the output. " +
-              "The redacted content is not recoverable from this file.\n\n" +
+              "\n\nVerified: 0 characters of extractable text remain in the output's text layer. " +
+              "Burned-in redactions are flattened into the page image, so the covered text cannot be recovered." +
+              imageOnlyNote(result.scan) +
+              "\n\n" +
               JSON.stringify(
                 {
                   input: abs,

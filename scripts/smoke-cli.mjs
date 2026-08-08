@@ -159,6 +159,76 @@ try {
     else ok("--detect ssn narrows to 1 detection");
   }
 
+  // --- form-field / annotation text and rotated runs -----------------------
+  // PII in an AcroForm field is invisible to getTextContent() but painted into
+  // the page on export; a rotated run needs the mark placed by orientation, not
+  // as if it were horizontal. The fixture's page body carries no PII, so every
+  // detection here comes from a field value or the rotated run.
+  {
+    const formPdf = join(dir, "form.pdf");
+    await run("node", [new URL("./make-form-pdf.mjs", import.meta.url).pathname, formPdf]);
+
+    const { code, stdout } = await cli(["check", formPdf, "--json"]);
+    const r = JSON.parse(stdout);
+    const counts = Object.fromEntries(r.byCategory.map((c) => [c.id, c.count]));
+    if (code !== 0) fail(`form check exited ${code}: ${stdout}`);
+    // Two SSNs — one in a form field, one rotated in the page body — and one
+    // email inside a field.
+    if (counts.ssn !== 2) fail(`expected 2 SSNs (field + rotated), got ${counts.ssn}`);
+    else ok("SSNs in a form field and in a rotated run are both detected");
+    if (counts.email !== 1) fail(`expected 1 email in a form field, got ${counts.email}`);
+    else ok("an email inside a form field is detected");
+
+    const formOut = join(dir, "form-clean.pdf");
+    const red = await cli(["redact", formPdf, "--out", formOut, "--json"]);
+    if (red.code !== 0) fail(`form redact exited ${red.code}: ${red.stdout}`);
+    else if (JSON.parse(red.stdout).redacted !== 3) {
+      fail(`expected 3 redactions on the form fixture, got ${JSON.parse(red.stdout).redacted}`);
+    } else ok("all three field/rotated matches are marked for redaction");
+    const ftext = await extractText(await readFile(formOut));
+    for (const secret of ["123-45-6789", "jdoe@secret.example.com", "987-65-4321"]) {
+      if (ftext.includes(secret)) fail(`form/rotated secret survived as text: ${secret}`);
+    }
+    if (ftext.trim().length === 0) ok("form-field/rotated export has no extractable text");
+    if ((await stat(formOut)).size < 15000) fail("form output too small to be a rendered page");
+    else ok("form output is a rendered page, not blanked");
+  }
+
+  // --- a scanned / image-only page is flagged, not silently passed ---------
+  // A page with imagery but no text layer can't be read by the text detectors.
+  // The result must say so rather than let "0 found" imply the page is clean.
+  {
+    const { createCanvas } = await import("@napi-rs/canvas");
+    const { PDFDocument } = await import("pdf-lib");
+    const c = createCanvas(600, 120);
+    const g = c.getContext("2d");
+    g.fillStyle = "#fff";
+    g.fillRect(0, 0, 600, 120);
+    g.fillStyle = "#000";
+    g.font = "28px sans-serif";
+    g.fillText("SSN: 123-45-6789", 20, 70);
+    const pdf = await PDFDocument.create();
+    const page = pdf.addPage([612, 792]);
+    page.drawImage(await pdf.embedPng(c.toBuffer("image/png")), {
+      x: 60,
+      y: 640,
+      width: 480,
+      height: 96,
+    });
+    const scanned = join(dir, "scanned.pdf");
+    await writeFile(scanned, await pdf.save());
+
+    const { stdout } = await cli(["check", scanned, "--json"]);
+    const r = JSON.parse(stdout);
+    if (!Array.isArray(r.imageOnlyPages) || !r.imageOnlyPages.includes(1)) {
+      fail(`image-only page not flagged: imageOnlyPages=${JSON.stringify(r.imageOnlyPages)}`);
+    } else ok("a scanned/image-only page is reported in imageOnlyPages");
+
+    const human = await cli(["check", scanned]);
+    if (!/no text layer/i.test(human.stdout)) fail("image-only page shows no plain-text caution");
+    else ok("image-only page surfaces a plain-text caution");
+  }
+
   // --- the licence boundary ------------------------------------------------
   {
     const { code, stdout } = await cli(["redact", big, "--out", join(dir, "big-out.pdf"), "--json"]);
