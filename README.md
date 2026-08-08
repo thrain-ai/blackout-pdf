@@ -88,5 +88,6 @@ nothing leaves the machine at all.
 
 ## License
 
-© Thrain LLC. Source available for transparency and audit; all rights
-reserved.
+[Apache-2.0](LICENSE) © Thrain LLC. The "Blackout" name and logo are
+trademarks of Thrain LLC (see [NOTICE](NOTICE)) — fork freely, but ship your
+fork under your own name.
