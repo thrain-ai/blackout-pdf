@@ -324,7 +324,10 @@ export default function Landing({ onFile, loading, error, pro }: Props) {
           </a>
         </p>
         <p className="copyright">
-          © {new Date().getFullYear()} {COMPANY}. All rights reserved.
+          © {new Date().getFullYear()} {COMPANY} ·{" "}
+          <a href={`${REPO_URL}/blob/main/LICENSE`} target="_blank" rel="noreferrer">
+            Apache-2.0
+          </a>
         </p>
       </footer>
     </div>

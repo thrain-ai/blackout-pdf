@@ -2,7 +2,7 @@
   "name": "@thrain/blackout",
   "version": "1.2.0",
   "description": "Permanently remove text from a PDF. Rasterises each page and rebuilds the file, so redacted text is gone rather than merely covered. Runs entirely locally.",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "type": "module",
   "bin": {
     "blackout": "dist/cli.mjs"
