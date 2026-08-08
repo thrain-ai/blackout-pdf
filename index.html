@@ -14,6 +14,11 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://blackout-license.thrain.workers.dev; worker-src 'self' blob:; form-action 'self'"
     />
+    <!-- No Referer on any outbound navigation (e.g. the checkout link), so a
+         post-payment URL carrying a session id can never leak downstream. The
+         header form of this, plus HSTS / X-Frame-Options / nosniff, are set at
+         the edge — they cannot be delivered via <meta>. -->
+    <meta name="referrer" content="no-referrer" />
 
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
