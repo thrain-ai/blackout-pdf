@@ -1,11 +1,17 @@
 import type { PDFPageProxy } from "pdfjs-dist";
 import type { TextItem } from "pdfjs-dist/types/src/display/api";
+import { OPS } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { PATTERNS, CUSTOM_PATTERN_ID, customTermRegex } from "./patterns.ts";
 import type { Rect, Suggestion } from "./types.ts";
+
+type Viewport = ReturnType<PDFPageProxy["getViewport"]>;
 
 interface PlacedItem {
   str: string;
   rect: Rect; // viewport scale-1, top-left origin
+  // The run is not horizontal (rotated or vertical text). Partial-item slicing
+  // assumes a horizontal advance, so a rotated run is covered whole instead.
+  rotated: boolean;
 }
 
 interface Line {
@@ -27,25 +33,46 @@ function placeItems(page: PDFPageProxy, items: TextItem[]): PlacedItem[] {
   const placed: PlacedItem[] = [];
   for (const it of items) {
     if (!it.str || !it.str.trim()) continue;
-    const tx = it.transform;
-    const x = tx[4];
-    const y = tx[5];
-    const h = Math.hypot(tx[2], tx[3]) || Math.abs(tx[3]) || 10;
-    // PDF user space is bottom-left origin; convert the baseline box.
-    const [vx1, vy1, vx2, vy2] = viewport.convertToViewportRectangle([
-      x,
-      y - h * 0.2,
-      x + it.width,
-      y + h,
-    ]);
+    const [a, b, c, d, e, f] = it.transform;
+    // Derive the glyph box from the full text matrix rather than x/y/width
+    // alone, so the mark tracks the glyphs when the run is rotated or vertical
+    // and not only when it is axis-aligned horizontal.
+    const adv = Math.hypot(a, b) || Math.abs(a) || 1; // advance-direction scale
+    let ax = c; // ascent vector (already scaled to glyph height)
+    let ay = d;
+    if (Math.hypot(ax, ay) < 1e-6) {
+      // Degenerate matrix with no vertical component: synthesise an up vector
+      // perpendicular to the advance so the box still has height.
+      ax = (-b / adv) * 10;
+      ay = (a / adv) * 10;
+    }
+    const vx = (a / adv) * it.width; // run vector along the baseline
+    const vy = (b / adv) * it.width;
+    // Four corners of the run in PDF user space: descent-to-ascent at each end.
+    const corners: Array<[number, number]> = [
+      [e - 0.2 * ax, f - 0.2 * ay],
+      [e + vx - 0.2 * ax, f + vy - 0.2 * ay],
+      [e + vx + ax, f + vy + ay],
+      [e + ax, f + ay],
+    ];
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const [px, py] of corners) {
+      const [qx, qy] = viewport.convertToViewportPoint(px, py);
+      minX = Math.min(minX, qx);
+      minY = Math.min(minY, qy);
+      maxX = Math.max(maxX, qx);
+      maxY = Math.max(maxY, qy);
+    }
+    const rotated =
+      Math.abs(b) > 1e-3 * Math.abs(a) + 1e-9 ||
+      Math.abs(c) > 1e-3 * Math.abs(d) + 1e-9;
     placed.push({
       str: it.str,
-      rect: {
-        x: Math.min(vx1, vx2),
-        y: Math.min(vy1, vy2),
-        w: Math.abs(vx2 - vx1),
-        h: Math.abs(vy2 - vy1),
-      },
+      rect: { x: minX, y: minY, w: maxX - minX, h: maxY - minY },
+      rotated,
     });
   }
   return placed;
@@ -147,6 +174,12 @@ function rangeToRects(line: Line, start: number, end: number): Rect[] {
     let j = i;
     while (j < end && line.charSource[j] === src) j++;
     const item = line.items[src];
+    if (item.rotated) {
+      // Horizontal slicing does not apply to a rotated run; cover it whole.
+      rects.push({ ...item.rect });
+      i = j;
+      continue;
+    }
     const c0 = line.charOffset[i];
     const c1 = line.charOffset[j - 1] + 1;
     const { x, w } = sliceX(item, c0, c1);
@@ -166,48 +199,166 @@ function mergeRects(rects: Rect[]): Rect | null {
   return { x: x0 - PAD, y: y0 - PAD, w: x1 - x0 + PAD * 2, h: y1 - y0 + PAD * 2 };
 }
 
-export async function findSuggestions(
-  page: PDFPageProxy,
-  pageIndex: number,
-  customTerms: string[] = [],
-): Promise<Suggestion[]> {
-  const content = await page.getTextContent();
-  const items = content.items.filter((i): i is TextItem => "str" in i);
-  const lines = buildLines(placeItems(page, items));
+interface Search {
+  id: string;
+  regex: RegExp;
+}
 
-  const searches = [
+function buildSearches(customTerms: string[]): Search[] {
+  return [
     ...PATTERNS.map((p) => ({ id: p.id, regex: p.regex })),
     ...customTerms
       .filter((t) => t.trim().length >= 2)
       .map((t) => ({ id: CUSTOM_PATTERN_ID, regex: customTermRegex(t) })),
   ];
+}
+
+// Run every pattern over `text`, most-specific first, letting an earlier match
+// claim its characters so a looser pattern cannot re-flag them. Emits one
+// suggestion per match, all sharing `rect` (used when the exact sub-geometry of
+// a match is not available, e.g. inside a form field).
+function collectMatches(
+  text: string,
+  searches: Search[],
+  rect: Rect,
+  pageIndex: number,
+  out: Suggestion[],
+): void {
+  const claimed = new Array<boolean>(text.length).fill(false);
+  for (const { id, regex } of searches) {
+    regex.lastIndex = 0;
+    for (const m of text.matchAll(regex)) {
+      if (m[0].length === 0) continue;
+      const start = m.index;
+      const end = start + m[0].length;
+      let overlap = false;
+      for (let c = start; c < end; c++) if (claimed[c]) overlap = true;
+      if (overlap) continue;
+      for (let c = start; c < end; c++) claimed[c] = true;
+      out.push({ id: genId(), pageIndex, rect, categoryId: id, text: m[0], accepted: false });
+    }
+  }
+}
+
+// pdf.js does not surface form-field values or annotation text through
+// getTextContent(), but it does paint them into the page image on export.
+// Pull that text out so the same detectors run over it.
+function annotationTexts(a: Record<string, unknown>): string[] {
+  const texts: string[] = [];
+  const push = (v: unknown) => {
+    if (typeof v === "string" && v.trim()) texts.push(v);
+  };
+  const fv = a.fieldValue;
+  if (Array.isArray(fv)) fv.forEach(push);
+  else push(fv);
+  push(a.contents);
+  const contentsObj = a.contentsObj as { str?: unknown } | undefined;
+  if (contentsObj) push(contentsObj.str);
+  return [...new Set(texts)];
+}
+
+function annotationRect(a: Record<string, unknown>, viewport: Viewport): Rect | null {
+  const r = a.rect as number[] | undefined;
+  if (!r || r.length < 4) return null;
+  const [vx1, vy1, vx2, vy2] = viewport.convertToViewportRectangle([r[0], r[1], r[2], r[3]]);
+  const x = Math.min(vx1, vx2);
+  const y = Math.min(vy1, vy2);
+  const w = Math.abs(vx2 - vx1);
+  const h = Math.abs(vy2 - vy1);
+  if (!(w > 0) || !(h > 0)) return null;
+  return { x, y, w, h };
+}
+
+const IMAGE_OPS = new Set(
+  [
+    OPS.paintImageXObject,
+    OPS.paintImageXObjectRepeat,
+    OPS.paintImageMaskXObject,
+    OPS.paintImageMaskXObjectGroup,
+    OPS.paintImageMaskXObjectRepeat,
+    OPS.paintInlineImageXObject,
+    OPS.paintInlineImageXObjectGroup,
+    OPS.paintSolidColorImageMask,
+  ].filter((v): v is number => typeof v === "number"),
+);
+
+async function pageHasImage(page: PDFPageProxy): Promise<boolean> {
+  try {
+    const ops = await page.getOperatorList();
+    return ops.fnArray.some((fn) => IMAGE_OPS.has(fn));
+  } catch {
+    return false;
+  }
+}
+
+export interface PageScan {
+  suggestions: Suggestion[];
+  // The page paints imagery but exposes no extractable text, so automatic
+  // detection cannot read it — a scanned or image-only page needing OCR.
+  imageOnly: boolean;
+}
+
+/**
+ * The full per-page detection pass: body text, plus form-field and annotation
+ * text, plus a flag for pages that carry only imagery. One getTextContent()
+ * call feeds both the search and the image-only determination.
+ */
+export async function scanPage(
+  page: PDFPageProxy,
+  pageIndex: number,
+  customTerms: string[] = [],
+): Promise<PageScan> {
+  const content = await page.getTextContent();
+  const items = content.items.filter((i): i is TextItem => "str" in i);
+  const hasText = items.some((i) => i.str.trim().length > 0);
+  const lines = buildLines(placeItems(page, items));
+  const searches = buildSearches(customTerms);
 
   const out: Suggestion[] = [];
   for (const line of lines) {
-    // Chars already claimed by an earlier (more specific) pattern.
     const claimed = new Array<boolean>(line.text.length).fill(false);
     for (const { id, regex } of searches) {
       regex.lastIndex = 0;
       for (const m of line.text.matchAll(regex)) {
+        if (m[0].length === 0) continue;
         const start = m.index;
         const end = start + m[0].length;
-        if (m[0].length === 0) continue;
         let overlap = false;
         for (let c = start; c < end; c++) if (claimed[c]) overlap = true;
         if (overlap) continue;
         const rect = mergeRects(rangeToRects(line, start, end));
         if (!rect) continue;
         for (let c = start; c < end; c++) claimed[c] = true;
-        out.push({
-          id: genId(),
-          pageIndex,
-          rect,
-          categoryId: id,
-          text: m[0],
-          accepted: false,
-        });
+        out.push({ id: genId(), pageIndex, rect, categoryId: id, text: m[0], accepted: false });
       }
     }
   }
-  return out;
+
+  // Form fields and annotations: whole-rectangle coverage, since per-glyph
+  // positions within a widget are not available.
+  let annotations: Array<Record<string, unknown>> = [];
+  try {
+    annotations = (await page.getAnnotations()) as Array<Record<string, unknown>>;
+  } catch {
+    annotations = [];
+  }
+  if (annotations.length) {
+    const viewport = page.getViewport({ scale: 1 });
+    for (const a of annotations) {
+      const rect = annotationRect(a, viewport);
+      if (!rect) continue;
+      for (const t of annotationTexts(a)) collectMatches(t, searches, rect, pageIndex, out);
+    }
+  }
+
+  const imageOnly = !hasText && (await pageHasImage(page));
+  return { suggestions: out, imageOnly };
+}
+
+export async function findSuggestions(
+  page: PDFPageProxy,
+  pageIndex: number,
+  customTerms: string[] = [],
+): Promise<Suggestion[]> {
+  return (await scanPage(page, pageIndex, customTerms)).suggestions;
 }

@@ -7,7 +7,7 @@
 // boundary, which the browser UI enforces in its own way.
 import { installNodePlatform } from "../platform/node.ts";
 import { loadPdf } from "../pdf/loader.ts";
-import { findSuggestions } from "../pdf/textSearch.ts";
+import { scanPage } from "../pdf/textSearch.ts";
 import { exportRedacted } from "../pdf/exporter.ts";
 import { orderAndNumber, type MarkInput } from "../pdf/marks.ts";
 import { PATTERNS, CUSTOM_PATTERN_ID } from "../pdf/patterns.ts";
@@ -63,6 +63,12 @@ export interface ScanResult {
   byCategory: CategoryCount[];
   /** Per-page counts, index 0 = page 1. */
   perPage: number[];
+  /**
+   * Page numbers (1-based) that carry only imagery and no text layer, so the
+   * automatic detectors could not read them — scanned pages needing OCR.
+   * Empty means every page was scannable.
+   */
+  imageOnlyPages: number[];
   licensed: boolean;
   licenseState: LicenseState;
   freePageLimit: number;
@@ -151,7 +157,12 @@ function checkTerms(raw: string[]): string[] {
 async function collect(
   bytes: Uint8Array,
   opts: ScanOptions,
-): Promise<{ pages: number; suggestions: Suggestion[]; wanted: Set<string> }> {
+): Promise<{
+  pages: number;
+  suggestions: Suggestion[];
+  wanted: Set<string>;
+  imageOnlyPages: number[];
+}> {
   // Whether the caller asked for terms is decided by what they actually passed,
   // never by what survived filtering.
   const terms = checkTerms(opts.terms ?? []);
@@ -162,16 +173,18 @@ async function collect(
   const doc = await loadPdf(new Uint8Array(bytes));
   try {
     const suggestions: Suggestion[] = [];
+    const imageOnlyPages: number[] = [];
     for (let i = 0; i < doc.numPages; i++) {
       const page = await doc.getPage(i + 1);
-      const found = await findSuggestions(page, i, terms);
-      // findSuggestions always runs the full pattern set so that the more
-      // specific patterns claim their characters first (an SSN before a phone
-      // number). Filtering afterwards preserves that precedence; narrowing the
-      // pattern list up front would not.
+      const { suggestions: found, imageOnly } = await scanPage(page, i, terms);
+      // scanPage always runs the full pattern set so that the more specific
+      // patterns claim their characters first (an SSN before a phone number).
+      // Filtering afterwards preserves that precedence; narrowing the pattern
+      // list up front would not.
       suggestions.push(...found.filter((s) => wanted.has(s.categoryId)));
+      if (imageOnly) imageOnlyPages.push(i + 1);
     }
-    return { pages: doc.numPages, suggestions, wanted };
+    return { pages: doc.numPages, suggestions, wanted, imageOnlyPages };
   } finally {
     await doc.destroy();
   }
@@ -182,6 +195,7 @@ function summarise(
   suggestions: Suggestion[],
   wanted: Set<string>,
   licenseState: LicenseState,
+  imageOnlyPages: number[],
 ): ScanResult {
   const counts = new Map<string, number>();
   const perPage = new Array<number>(pages).fill(0);
@@ -199,6 +213,7 @@ function summarise(
       count: counts.get(id) ?? 0,
     })),
     perPage,
+    imageOnlyPages,
     licensed: licenseState === "valid",
     licenseState,
     freePageLimit: FREE_PAGE_LIMIT,
@@ -209,8 +224,8 @@ function summarise(
 /** What would be redacted, without producing a file. */
 export async function scan(bytes: Uint8Array, opts: ScanOptions = {}): Promise<ScanResult> {
   const licenseState = await licenseStateOf(opts.license);
-  const { pages, suggestions, wanted } = await collect(bytes, opts);
-  return summarise(pages, suggestions, wanted, licenseState);
+  const { pages, suggestions, wanted, imageOnlyPages } = await collect(bytes, opts);
+  return summarise(pages, suggestions, wanted, licenseState, imageOnlyPages);
 }
 
 export interface RedactResult {
@@ -231,7 +246,7 @@ export async function redact(
   opts: ScanOptions = {},
 ): Promise<RedactResult> {
   const licenseState = await licenseStateOf(opts.license);
-  const { pages, suggestions, wanted } = await collect(bytes, opts);
+  const { pages, suggestions, wanted, imageOnlyPages } = await collect(bytes, opts);
 
   if (licenseState !== "valid" && pages > FREE_PAGE_LIMIT) {
     // Two different problems, two different fixes — and telling someone who
@@ -278,7 +293,7 @@ export async function redact(
 
   return {
     pdf,
-    scan: summarise(pages, suggestions, wanted, licenseState),
+    scan: summarise(pages, suggestions, wanted, licenseState, imageOnlyPages),
     extractableChars: await extractableTextLength(pdf),
   };
 }

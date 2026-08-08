@@ -20,7 +20,10 @@ export const PATTERNS: PatternDef[] = [
   {
     id: "email",
     label: "Email addresses",
-    regex: /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g,
+    // Bounded quantifiers and a dot-free label class (each label is separated
+    // by a literal ".") keep matching strictly linear, so detection stays fast
+    // on any input, including long adversarial runs from an untrusted PDF.
+    regex: /[A-Za-z0-9._%+-]{1,64}@(?:[A-Za-z0-9-]{1,63}\.)+[A-Za-z]{2,24}/g,
   },
   {
     id: "phone",

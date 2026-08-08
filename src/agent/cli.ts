@@ -195,6 +195,22 @@ function describe(result: ScanResult): string[] {
 }
 
 /**
+ * A page with imagery but no text layer can't be read by the text detectors, so
+ * a scanned document could pass with nothing found. Say so plainly rather than
+ * letting silence imply the page was clean.
+ */
+function imageOnlyNote(result: ScanResult): string {
+  const p = result.imageOnlyPages;
+  if (!p.length) return "";
+  const noun = p.length === 1 ? `Page ${p[0]} has` : `Pages ${p.join(", ")} have`;
+  return (
+    `\n  Note: ${noun} no text layer (scanned or image-only), so the automatic ` +
+    `detectors could not read ${p.length === 1 ? "it" : "them"}. Review or OCR ` +
+    `${p.length === 1 ? "that page" : "those pages"} before relying on this copy.\n`
+  );
+}
+
+/**
  * Surfaced on the success path, where the run still worked but quietly ran as
  * free tier. The over-limit case is a hard LICENSE_INVALID error from the
  * engine instead — there, the bad token is the whole reason the run failed.
@@ -274,6 +290,7 @@ async function main(argv: string[]): Promise<number> {
               `redacting this file needs a Pro license.\n`,
         );
       }
+      process.stdout.write(imageOnlyNote(result));
     }
     warnIfLicenseInvalid(result, args);
     return EXIT_OK;
@@ -333,7 +350,8 @@ async function main(argv: string[]): Promise<number> {
         `  ${result.scan.pages} page${result.scan.pages === 1 ? "" : "s"} rasterised, ` +
         `${result.scan.total} redaction${result.scan.total === 1 ? "" : "s"} burned in\n` +
         describe(result.scan).join("\n") +
-        `\n  verified: 0 characters of extractable text remain\n`,
+        `\n  verified: 0 characters of extractable text remain\n` +
+        imageOnlyNote(result.scan),
     );
   }
   warnIfLicenseInvalid(result.scan, args);
